@@ -1,0 +1,110 @@
+import { useEffect, useState } from 'react';
+import { api } from '../api/endpoints';
+import type { Project } from '../api/types';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonRows } from '../components/Skeleton';
+import { IconPlus, IconSearch } from '../components/icons';
+
+/** 项目管理：所有项目的入口，支持搜索与切换 */
+export function ProjectListPage({ navigate }: { navigate: (to: string) => void }) {
+  const [projects, setProjects] = useState<Project[] | null>(null);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    api.projects().then(setProjects).catch(() => setProjects([]));
+  }, []);
+
+  if (projects === null) {
+    return (
+      <div className="page page--stack">
+        <SkeletonRows count={3} />
+      </div>
+    );
+  }
+
+  const keyword = query.trim().toLowerCase();
+  const visible = keyword
+    ? projects.filter((item) =>
+        `${item.customer_name}${item.name}${item.code}`.toLowerCase().includes(keyword),
+      )
+    : projects;
+
+  return (
+    <div className="page page--stack">
+      <section className="section-open">
+        <header className="section-open__head">
+          <div>
+            <h3>项目管理</h3>
+          </div>
+          <button type="button" className="btn btn--primary btn--sm" onClick={() => navigate('/')}>
+            <IconPlus width={14} height={14} />
+            新建分析
+          </button>
+        </header>
+
+        <label className="search-field" style={{ maxWidth: 320 }}>
+          <IconSearch width={15} height={15} />
+          <input
+            className="search-field__input"
+            placeholder="搜索客户或项目"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+
+        {visible.length === 0 ? (
+          <EmptyState
+            icon={<IconPlus width={26} height={26} />}
+            title={projects.length ? '没有匹配的项目' : '还没有项目'}
+            description={
+              projects.length
+                ? '换个关键词试试。'
+                : '去首页新建分析，上传客户材料即可。'
+            }
+          />
+        ) : (
+          <div className="list-shell">
+            {visible.map((item) => {
+              const counts = item.counts;
+              return (
+                <div key={item.id} className="list-row">
+                  <div className="list-row__main">
+                    <span className="list-row__title">{item.customer_name || '待识别客户'}</span>
+                    <span className="list-row__sub">
+                      {item.name || '待识别项目'}
+                      {item.owner_name ? ` · 负责人 ${item.owner_name}` : ''}
+                    </span>
+                  </div>
+                  <div className="list-row__metrics">
+                    <div className="list-row__metric">
+                      <dt>需求</dt>
+                      <dd>{counts?.requirements_confirmed ?? 0}</dd>
+                    </div>
+                    <div className="list-row__metric">
+                      <dt>匹配</dt>
+                      <dd>{counts?.matches ?? 0}</dd>
+                    </div>
+                    <div className="list-row__metric">
+                      <dt>缺口</dt>
+                      <dd>{counts?.matches_none ?? 0}</dd>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => {
+                      window.localStorage.setItem('fitwise.lastProject', String(item.id));
+                      navigate(`/projects/${item.id}/materials`);
+                    }}
+                  >
+                    打开
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

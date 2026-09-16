@@ -1,0 +1,1421 @@
+{
+  "company": {
+    "name": "星云科技",
+    "shortName": "星云",
+    "description": "企业文档智能与 OCR 能力提供商，产品覆盖识别、解析、审核与企业级私有化部署。",
+    "knowledgeBase": {
+      "name": "星云企业知识库（Demo）",
+      "docCount": 9,
+      "caseCount": 5,
+      "updatedAt": "2026-09-01"
+    }
+  },
+  "products": [
+    {
+      "id": "product-ocr",
+      "name": "星云 OCR",
+      "englishName": "Nebula OCR",
+      "tagline": "票据、卡证、通用文字识别引擎",
+      "category": "产品能力",
+      "capabilityTags": [
+        "ocr",
+        "multi-language",
+        "zh",
+        "en",
+        "ja",
+        "ticket",
+        "card",
+        "accuracy"
+      ],
+      "keyPoints": [
+        "中文 / 英文 / 日文正式支持",
+        "印刷体标准场景准确率 98.6%",
+        "票据与卡证结构化字段输出"
+      ],
+      "status": "ga",
+      "statusLabel": "正式版 v3.2",
+      "docIds": [
+        "doc-ocr-core",
+        "doc-ocr-tech"
+      ]
+    },
+    {
+      "id": "product-docparse",
+      "name": "星云文档解析",
+      "englishName": "Nebula DocParse",
+      "tagline": "PDF / Word / Excel / 扫描件版面还原与结构化",
+      "category": "产品能力",
+      "capabilityTags": [
+        "document-parse",
+        "pdf",
+        "office",
+        "table",
+        "layout",
+        "scanned"
+      ],
+      "keyPoints": [
+        "版面分析与表格结构化",
+        "支持扫描件与双栏文档",
+        "输出结构化 JSON / Markdown"
+      ],
+      "status": "ga",
+      "statusLabel": "正式版 v2.1",
+      "docIds": [
+        "doc-docparse"
+      ]
+    },
+    {
+      "id": "product-audit",
+      "name": "星云智能审核",
+      "englishName": "Nebula Audit",
+      "tagline": "规则 + 模型双引擎的票据与单证合规审核",
+      "category": "产品能力",
+      "capabilityTags": [
+        "audit",
+        "rule-engine",
+        "compliance-check",
+        "ticket"
+      ],
+      "keyPoints": [
+        "可配置规则引擎",
+        "标准票据类型库（增值税发票、行程单、火车票等）",
+        "输出审核结论与依据"
+      ],
+      "status": "ga",
+      "statusLabel": "正式版 v1.8",
+      "docIds": [
+        "doc-audit"
+      ]
+    },
+    {
+      "id": "product-enterprise",
+      "name": "星云企业版",
+      "englishName": "Nebula Enterprise",
+      "tagline": "私有化 / 全离线部署与信创适配",
+      "category": "平台能力",
+      "capabilityTags": [
+        "on-premise",
+        "offline",
+        "xinchuang",
+        "kylin",
+        "kunpeng",
+        "security",
+        "audit-log"
+      ],
+      "keyPoints": [
+        "数据不出域、全离线运行",
+        "信创适配（麒麟 / 统信 + 鲲鹏 / 海光）",
+        "集群化部署与审计日志"
+      ],
+      "status": "ga",
+      "statusLabel": "正式版 v4.0",
+      "docIds": [
+        "doc-enterprise-deploy",
+        "doc-enterprise-security"
+      ]
+    },
+    {
+      "id": "product-api",
+      "name": "星云 API",
+      "englishName": "Nebula API",
+      "tagline": "标准 REST 接口与多语言 SDK",
+      "category": "平台能力",
+      "capabilityTags": [
+        "api",
+        "integration",
+        "sdk",
+        "concurrency",
+        "callback"
+      ],
+      "keyPoints": [
+        "REST / HTTPS 接口，Java / Python / Go SDK",
+        "异步批量任务与回调",
+        "默认并发 200 QPS，可扩容"
+      ],
+      "status": "ga",
+      "statusLabel": "正式版 v3.0",
+      "docIds": [
+        "doc-api"
+      ]
+    },
+    {
+      "id": "product-multilang",
+      "name": "星云多语言增强包",
+      "englishName": "Nebula Multilingual Pack",
+      "tagline": "韩语 / 泰语等扩展语种识别（Beta）",
+      "category": "产品能力",
+      "capabilityTags": [
+        "multi-language",
+        "korean",
+        "thai",
+        "beta"
+      ],
+      "keyPoints": [
+        "韩语 / 泰语 Beta 模型",
+        "需独立 GPU 资源",
+        "暂不提供 SLA 与批量交付承诺"
+      ],
+      "status": "beta",
+      "statusLabel": "Beta v0.9",
+      "docIds": [
+        "doc-multilang"
+      ]
+    },
+    {
+      "id": "product-delivery",
+      "name": "星云交付服务",
+      "englishName": "Nebula Delivery",
+      "tagline": "实施、驻场、调优与验收支持",
+      "category": "平台能力",
+      "capabilityTags": [
+        "delivery",
+        "customization",
+        "sla",
+        "on-site"
+      ],
+      "keyPoints": [
+        "标准实施周期 6-8 周",
+        "准确率调优与验收测试支持",
+        "定制开发需立项评估"
+      ],
+      "status": "ga",
+      "statusLabel": "交付标准 v2.0",
+      "docIds": [
+        "doc-delivery"
+      ]
+    }
+  ],
+  "docs": [
+    {
+      "id": "doc-ocr-core",
+      "productName": "星云 OCR",
+      "docTitle": "星云 OCR 产品能力说明",
+      "docType": "产品文档",
+      "version": "v3.2",
+      "updatedAt": "2026-07-18",
+      "capabilityTags": [
+        "ocr",
+        "multi-language",
+        "zh",
+        "en",
+        "ja",
+        "ticket",
+        "card",
+        "accuracy",
+        "ocr-accuracy",
+        "structured-fields"
+      ],
+      "description": "通用文字、票据、卡证识别引擎，输出字段级结构化结果，支持中英日混排与图像增强预处理。",
+      "supportedScope": [
+        "通用文字识别（印刷体 / 有限手写体）",
+        "标准票据识别：增值税发票、行程单、火车票等 7 类",
+        "卡证识别：身份证、银行卡、营业执照",
+        "字段级结构化输出与置信度"
+      ],
+      "limitations": [
+        "韩语、泰语等语种需多语言增强包",
+        "手写体、低质量复印件准确率下降",
+        "99% 以上准确率需按客户样本调优评测"
+      ],
+      "deployment": [
+        "私有化部署",
+        "公有云 API",
+        "混合部署"
+      ],
+      "apiCapabilities": [
+        "REST 接口",
+        "Java / Python / Go SDK",
+        "批量异步任务",
+        "结果回调"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "ocr",
+            "structured-fields",
+            "ticket",
+            "card"
+          ],
+          "scope": "识别对象与字段级结构化输出",
+          "page": 6,
+          "heading": "2.1 识别对象与输出格式",
+          "excerpt": "支持通用文字、票据（增值税发票、行程单、火车票等标准票据）、卡证三类识别任务，输出字段级结构化结果与置信度。"
+        },
+        {
+          "tags": [
+            "multi-language",
+            "zh",
+            "en",
+            "ja"
+          ],
+          "scope": "正式支持简体中文、繁体中文、英文、日文",
+          "page": 8,
+          "heading": "2.3 语言支持范围",
+          "excerpt": "正式支持语言：简体中文、繁体中文、英文、日文；支持语言混排识别，单页最多 3 种语言混排。"
+        },
+        {
+          "tags": [
+            "accuracy",
+            "ocr-accuracy"
+          ],
+          "scope": "标准印刷体字段级准确率 98.6%",
+          "page": 12,
+          "heading": "3.2 准确率指标",
+          "excerpt": "标准印刷体场景字段级准确率 98.6%（内部评测集，A4 / 300dpi）；手写体场景准确率 92.1%。准确率随页型、扫描质量与字段定义变化。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "korean"
+          ],
+          "impact": "limitation",
+          "detail": "韩语未列入正式支持范围，标准版不提供韩语识别，需通过多语言增强包（Beta）评估。",
+          "followUp": "向产品线确认韩语是否可纳入本期交付范围",
+          "page": 8,
+          "heading": "2.3 语言支持范围",
+          "excerpt": "正式支持语言：简体中文、繁体中文、英文、日文。韩语、泰语等语种见《多语言增强包（Beta）技术说明》。"
+        },
+        {
+          "tags": [
+            "accuracy-99"
+          ],
+          "impact": "limitation",
+          "detail": "98.6% 为内部评测集结果，99% 字段级准确率需基于客户样本调优并按字段口径重新评测。",
+          "followUp": "与客户确认准确率字段口径与验收评测集",
+          "page": 12,
+          "heading": "3.2 准确率指标",
+          "excerpt": "准确率随页型、扫描质量与字段定义变化；项目交付前需以客户样本进行验收评测，验收口径需在启动阶段冻结。"
+        },
+        {
+          "tags": [
+            "handwriting"
+          ],
+          "impact": "limitation",
+          "detail": "手写体、低质量复印件、盖章遮挡场景准确率明显下降。",
+          "page": 14,
+          "heading": "3.4 使用限制",
+          "excerpt": "手写体准确率 92.1%；严重倾斜、模糊、盖章遮挡的影像建议先做图像增强预处理。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 6,
+          "heading": "2.1 识别对象与输出格式",
+          "excerpt": "票据、卡证、通用文字三类识别任务，输出字段级结构化结果。"
+        },
+        {
+          "page": 8,
+          "heading": "2.3 语言支持范围",
+          "excerpt": "正式支持中文、繁体中文、英文、日文；韩语需增强包。"
+        },
+        {
+          "page": 12,
+          "heading": "3.2 准确率指标",
+          "excerpt": "印刷体字段级准确率 98.6%，手写体 92.1%（内部评测集）。"
+        },
+        {
+          "page": 14,
+          "heading": "3.4 使用限制",
+          "excerpt": "低质量影像、手写体、盖章遮挡场景准确率下降。"
+        }
+      ]
+    },
+    {
+      "id": "doc-ocr-tech",
+      "productName": "星云 OCR",
+      "docTitle": "星云 OCR 技术架构与性能白皮书",
+      "docType": "技术文档",
+      "version": "v2.4",
+      "updatedAt": "2026-06-30",
+      "capabilityTags": [
+        "ocr",
+        "throughput",
+        "cluster-scale",
+        "performance",
+        "concurrency",
+        "cluster",
+        "gpu",
+        "architecture"
+      ],
+      "description": "识别引擎集群架构、容量模型与实测性能数据，含横向扩展与定制模型说明。",
+      "supportedScope": [
+        "无状态识别服务，支持按业务域横向扩容",
+        "多租户队列与优先级调度",
+        "6 节点集群实测 52 万页/日",
+        "支持定制模型训练扩展新票据类型"
+      ],
+      "limitations": [
+        "吞吐与页型复杂度强相关",
+        "特殊票据需定制训练（6-10 周）"
+      ],
+      "deployment": [
+        "Kubernetes 集群",
+        "Docker Compose",
+        "裸机 + 容器"
+      ],
+      "apiCapabilities": [
+        "内部 gRPC 服务",
+        "对外 REST 网关",
+        "监控指标（Prometheus）"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "throughput",
+            "cluster-scale",
+            "performance"
+          ],
+          "scope": "6 节点集群日均 52 万页（纯文本页型）",
+          "page": 17,
+          "heading": "4.2 集群吞吐实测",
+          "excerpt": "6 节点 GPU 集群（每节点 2×T4）实测日均处理 52 万页（A4 单页文本，平均 1.2 秒/页），可通过增加节点线性扩展。"
+        },
+        {
+          "tags": [
+            "cluster",
+            "concurrency",
+            "performance"
+          ],
+          "scope": "无状态服务横向扩展与优先级调度",
+          "page": 9,
+          "heading": "3.1 集群架构",
+          "excerpt": "识别服务无状态，可按业务域横向扩容；支持多租户队列与优先级调度，保证核心业务链路优先处理。"
+        },
+        {
+          "tags": [
+            "customization",
+            "model-training"
+          ],
+          "scope": "支持定制模型扩展新票据类型",
+          "page": 22,
+          "heading": "6.3 扩展与定制",
+          "excerpt": "通过定制训练可扩展新的票据类型，需提供标注样本并独立评估模型精度与上线周期。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "throughput-confirmation"
+          ],
+          "impact": "limitation",
+          "detail": "52 万页/日基于 A4 单页文本页型，票据 / 表格类页型单页耗时更高，需按客户实际页型压测确认节点数。",
+          "followUp": "获取客户页型分布与峰值倍数，安排 POC 压测",
+          "page": 17,
+          "heading": "4.2 集群吞吐实测",
+          "excerpt": "吞吐能力与页型复杂度强相关：票据类页型平均耗时约为纯文本页的 1.8 倍，建议以真实样本进行容量评估。"
+        },
+        {
+          "tags": [
+            "special-ticket"
+          ],
+          "impact": "gap",
+          "detail": "财政电子票据、海关缴款书等特殊票据需通过定制模型训练扩展，不在标准能力与标准交付周期内。",
+          "followUp": "确认是否允许定制开发，评估样本量与训练周期（约 6-10 周）",
+          "page": 22,
+          "heading": "6.3 扩展与定制",
+          "excerpt": "新增票据类型需收集不少于 5,000 张标注样本，定制训练周期约 6-10 周，需立项评估。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 9,
+          "heading": "3.1 集群架构",
+          "excerpt": "无状态服务，支持横向扩容与多租户优先级调度。"
+        },
+        {
+          "page": 17,
+          "heading": "4.2 集群吞吐实测",
+          "excerpt": "6 节点集群实测 52 万页/日（A4 文本页型）。"
+        },
+        {
+          "page": 22,
+          "heading": "6.3 扩展与定制",
+          "excerpt": "新增票据类型需 5,000 张以上标注样本，周期 6-10 周。"
+        }
+      ]
+    },
+    {
+      "id": "doc-docparse",
+      "productName": "星云文档解析",
+      "docTitle": "星云文档解析产品能力说明",
+      "docType": "产品文档",
+      "version": "v2.1",
+      "updatedAt": "2026-05-22",
+      "capabilityTags": [
+        "document-parse",
+        "pdf",
+        "office",
+        "word",
+        "excel",
+        "table",
+        "layout",
+        "scanned",
+        "archive"
+      ],
+      "description": "支持 PDF、Office、扫描件与图片的版面还原与表格结构化，输出结构化 JSON / Markdown。",
+      "supportedScope": [
+        "PDF（含扫描件）、Word、Excel、图片、单页 OFD",
+        "版面分析与阅读顺序还原",
+        "无线框表格、合并单元格、跨页表格结构化"
+      ],
+      "limitations": [
+        "多页 OFD 需先转 PDF",
+        "复杂嵌套表格准确率约 90%"
+      ],
+      "deployment": [
+        "私有化部署",
+        "公有云 API"
+      ],
+      "apiCapabilities": [
+        "REST 接口",
+        "结构化 JSON / Markdown 输出",
+        "批量任务与回调"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "document-parse",
+            "pdf",
+            "office",
+            "word",
+            "excel",
+            "scanned"
+          ],
+          "scope": "主流文档格式与扫描件解析",
+          "page": 6,
+          "heading": "2.1 支持格式",
+          "excerpt": "支持 PDF（含扫描件）、Word（doc/docx）、Excel（xls/xlsx）、图片（jpg/png/tiff）与单页 OFD 文件。"
+        },
+        {
+          "tags": [
+            "table",
+            "layout",
+            "archive"
+          ],
+          "scope": "表格与版面结构化",
+          "page": 11,
+          "heading": "2.4 表格与版面还原",
+          "excerpt": "支持无线框表格、合并单元格与跨页表格结构化，输出行列坐标与单元格置信度，可直接写入档案系统。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "ofd-multi"
+          ],
+          "impact": "limitation",
+          "detail": "OFD 仅支持单页解析，多页 OFD 需先转换为 PDF。",
+          "page": 11,
+          "heading": "2.4 表格与版面还原",
+          "excerpt": "OFD 单页文件可直接解析；多页 OFD 建议先做格式转换。"
+        },
+        {
+          "tags": [
+            "table-complex"
+          ],
+          "impact": "limitation",
+          "detail": "无边框嵌套表格与多级表头准确率约 90%，需人工复核规则兜底。",
+          "page": 19,
+          "heading": "4.1 已知限制",
+          "excerpt": "复杂嵌套表格的结构化准确率约 90%，建议配合人工复核或规则校验。"
+        },
+        {
+          "tags": [
+            "large-format"
+          ],
+          "impact": "gap",
+          "detail": "大幅面工程图纸（A0/A1）不在标准解析范围内：标准产品不提供自动分幅与图纸要素提取，需人工分幅后按普通图片处理，或单独立项做定制预处理。",
+          "followUp": "先问清大幅面图纸的数量和用途，确认客户能否接受人工分幅，或是否单独立项",
+          "page": 19,
+          "heading": "4.1 已知限制",
+          "excerpt": "大幅面工程图纸（A0 及以上）需人工分幅后按图片解析，标准产品不含图纸要素提取。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 6,
+          "heading": "2.1 支持格式",
+          "excerpt": "PDF / Word / Excel / 图片 / 单页 OFD。"
+        },
+        {
+          "page": 11,
+          "heading": "2.4 表格与版面还原",
+          "excerpt": "无线框表格、跨页表格结构化，输出单元格置信度。"
+        },
+        {
+          "page": 19,
+          "heading": "4.1 已知限制",
+          "excerpt": "复杂嵌套表格准确率约 90%，需人工复核。"
+        }
+      ]
+    },
+    {
+      "id": "doc-enterprise-deploy",
+      "productName": "星云企业版",
+      "docTitle": "星云企业版私有化部署指南",
+      "docType": "部署文档",
+      "version": "v4.0",
+      "updatedAt": "2026-08-05",
+      "capabilityTags": [
+        "on-premise",
+        "offline",
+        "deployment",
+        "xinchuang",
+        "kylin",
+        "uniontech",
+        "kunpeng",
+        "haiguang",
+        "k8s",
+        "cluster",
+        "domestic-stack"
+      ],
+      "description": "私有化 / 全离线部署形态、信创适配矩阵、资源要求与离线升级方案。",
+      "supportedScope": [
+        "物理机、虚拟机、Docker Compose、Kubernetes 四种部署形态",
+        "全离线运行与离线升级（镜像仓库 / U 盘）",
+        "信创适配：麒麟 V10、统信 UOS 20 + 鲲鹏 920、海光 3000/5000"
+      ],
+      "limitations": [
+        "最小生产集群 3 节点",
+        "信创 GPU（昇腾）无生产案例"
+      ],
+      "deployment": [
+        "私有化部署",
+        "全离线私有化",
+        "信创环境"
+      ],
+      "apiCapabilities": [
+        "内网 REST 网关",
+        "离线授权与镜像包",
+        "监控与运维平台"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "on-premise",
+            "deployment",
+            "offline"
+          ],
+          "scope": "私有化 / 全离线部署形态",
+          "page": 5,
+          "heading": "2.1 部署形态",
+          "excerpt": "支持物理机、虚拟机、Docker Compose 与 Kubernetes 四种部署形态；全离线环境无需外网连接即可运行。"
+        },
+        {
+          "tags": [
+            "offline",
+            "deployment"
+          ],
+          "scope": "离线升级与灰度回滚",
+          "page": 12,
+          "heading": "3.3 离线运行与升级",
+          "excerpt": "模型与规则库支持离线 U 盘 / 内网镜像仓库升级，升级过程支持灰度与回滚，不影响在线业务。"
+        },
+        {
+          "tags": [
+            "xinchuang",
+            "kylin",
+            "uniontech",
+            "kunpeng",
+            "haiguang",
+            "domestic-stack"
+          ],
+          "scope": "国产化 OS + CPU 全栈适配",
+          "page": 20,
+          "heading": "5.1 信创适配矩阵",
+          "excerpt": "已完成适配：麒麟 V10、统信 UOS 20；CPU 平台：鲲鹏 920、海光 3000/5000；数据库：达梦、人大金仓。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "domestic-gpu"
+          ],
+          "impact": "needs-confirmation",
+          "detail": "信创 GPU（昇腾 910B）已完成实验室验证，暂无生产项目案例，需按项目确认排期。",
+          "followUp": "若客户要求全栈信创 GPU，需与平台研发确认适配排期",
+          "page": 20,
+          "heading": "5.1 信创适配矩阵",
+          "excerpt": "昇腾 910B 已完成实验室验证，尚未在客户生产环境交付。"
+        },
+        {
+          "tags": [
+            "resource-small"
+          ],
+          "impact": "limitation",
+          "detail": "最小生产集群为 3 节点（每节点 16C/64G/1×GPU），低于该配置无法保证吞吐。",
+          "page": 26,
+          "heading": "6.1 资源要求",
+          "excerpt": "生产环境建议 3 节点起步；单节点部署仅建议用于 POC 验证。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 5,
+          "heading": "2.1 部署形态",
+          "excerpt": "物理机 / 虚拟机 / Docker / Kubernetes，支持全离线运行。"
+        },
+        {
+          "page": 12,
+          "heading": "3.3 离线运行与升级",
+          "excerpt": "离线镜像仓库升级，支持灰度与回滚。"
+        },
+        {
+          "page": 20,
+          "heading": "5.1 信创适配矩阵",
+          "excerpt": "麒麟 V10 / 统信 UOS 20 + 鲲鹏 920 / 海光 3000 已适配。"
+        },
+        {
+          "page": 26,
+          "heading": "6.1 资源要求",
+          "excerpt": "生产环境建议 3 节点起步。"
+        }
+      ]
+    },
+    {
+      "id": "doc-enterprise-security",
+      "productName": "星云企业版",
+      "docTitle": "星云企业版安全与合规说明",
+      "docType": "安全合规文档",
+      "version": "v1.6",
+      "updatedAt": "2026-07-02",
+      "capabilityTags": [
+        "security",
+        "data-residency",
+        "audit-log",
+        "encryption",
+        "permission",
+        "compliance",
+        "mlps"
+      ],
+      "description": "数据不出域、审计日志、加密与权限能力，等保三级技术要求对照说明。",
+      "supportedScope": [
+        "全部数据在内网处理，无外联遥测",
+        "管理 / 访问 / 模型调用三类审计日志",
+        "国密 SM4 / SM2 加密与三员管理"
+      ],
+      "limitations": [
+        "对接客户 SIEM 需少量适配开发"
+      ],
+      "deployment": [
+        "私有化部署",
+        "全离线私有化"
+      ],
+      "apiCapabilities": [
+        "日志 Syslog / Kafka 输出",
+        "统一身份对接（LDAP / OAuth2）"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "data-residency",
+            "security",
+            "offline"
+          ],
+          "scope": "数据不出域，无外联遥测",
+          "page": 14,
+          "heading": "3.1 数据不出域",
+          "excerpt": "全部识别与解析在客户内网完成，不上传任何原文、影像或识别结果；系统不包含外联遥测模块。"
+        },
+        {
+          "tags": [
+            "audit-log",
+            "compliance"
+          ],
+          "scope": "三类审计日志，默认留存 12 个月",
+          "page": 9,
+          "heading": "2.4 审计日志",
+          "excerpt": "提供管理操作、数据访问、模型调用三类审计日志，支持对接客户日志平台，默认留存 12 个月（可配置）。"
+        },
+        {
+          "tags": [
+            "encryption",
+            "permission",
+            "mlps"
+          ],
+          "scope": "等保三级技术要求对照",
+          "page": 17,
+          "heading": "3.4 安全能力",
+          "excerpt": "支持国密 SM4 存储加密、SM2 传输加密、细粒度权限与三员管理，符合等保三级技术要求。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "log-export",
+            "audit-export"
+          ],
+          "impact": "needs-confirmation",
+          "detail": "日志对接客户 SIEM 需要按客户日志格式做适配开发（约 3 人日），需确认目标平台与字段要求。",
+          "followUp": "确认客户日志平台类型（Syslog / Kafka / 其他）与字段规范",
+          "page": 9,
+          "heading": "2.4 审计日志",
+          "excerpt": "标准输出为 Syslog 与 Kafka；其它格式需项目适配。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 9,
+          "heading": "2.4 审计日志",
+          "excerpt": "三类审计日志，默认留存 12 个月，可对接日志平台。"
+        },
+        {
+          "page": 14,
+          "heading": "3.1 数据不出域",
+          "excerpt": "数据全部在内网处理，无外联遥测模块。"
+        },
+        {
+          "page": 17,
+          "heading": "3.4 安全能力",
+          "excerpt": "国密加密、三员管理，符合等保三级技术要求。"
+        }
+      ]
+    },
+    {
+      "id": "doc-api",
+      "productName": "星云 API",
+      "docTitle": "星云 API 接口与集成能力说明",
+      "docType": "API 文档",
+      "version": "v3.0",
+      "updatedAt": "2026-08-12",
+      "capabilityTags": [
+        "api",
+        "integration",
+        "sdk",
+        "concurrency",
+        "concurrency-200",
+        "callback",
+        "batch",
+        "image-platform"
+      ],
+      "description": "接口清单、并发配额、异步批量任务，以及与影像 / OA 系统的集成方式。",
+      "supportedScope": [
+        "REST/HTTPS 接口 42 个，覆盖识别、解析、审核、任务查询",
+        "Java / Python / Go / C# SDK",
+        "默认并发 200 QPS，异步批量任务单任务 10 万页",
+        "适配层 + 事件回调的第三方系统集成模式"
+      ],
+      "limitations": [
+        "超过默认并发需单独扩容评估",
+        "集成方案依赖客户侧系统文档"
+      ],
+      "deployment": [
+        "私有化部署",
+        "公有云 API",
+        "混合部署"
+      ],
+      "apiCapabilities": [
+        "REST / HTTPS",
+        "Webhook 回调",
+        "批量异步任务",
+        "OpenAPI 3.0 文档"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "api",
+            "sdk",
+            "integration"
+          ],
+          "scope": "42 个标准接口 + 四语言 SDK",
+          "page": 4,
+          "heading": "2.1 接口清单",
+          "excerpt": "提供 REST/HTTPS 接口 42 个，覆盖识别、解析、审核、任务查询；提供 Java / Python / Go / C# SDK。"
+        },
+        {
+          "tags": [
+            "concurrency",
+            "concurrency-200",
+            "batch",
+            "callback"
+          ],
+          "scope": "默认 200 QPS，支持异步批量与回调",
+          "page": 10,
+          "heading": "3.2 配额与并发",
+          "excerpt": "企业版单租户默认并发 200 QPS，支持异步批量任务（单任务最多 100,000 页）与回调通知，并发配额可按集群规模扩容。"
+        },
+        {
+          "tags": [
+            "integration",
+            "image-platform"
+          ],
+          "scope": "影像 / OA 系统标准集成模式",
+          "page": 18,
+          "heading": "5.2 与影像 / OA 系统集成",
+          "excerpt": "与第三方影像平台集成采用“适配层 + 事件回调”模式，适配层负责影像拉取、结果回写与状态同步，标准集成工作量 5-8 人日。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "concurrency-1000"
+          ],
+          "impact": "limitation",
+          "detail": "超过 200 QPS 的并发需求需按扩容方案单独评估资源与授权。",
+          "page": 10,
+          "heading": "3.2 配额与并发",
+          "excerpt": "超出默认配额的并发需求需提交扩容评估，通常通过增加识别节点实现。"
+        },
+        {
+          "tags": [
+            "integration-peer-unknown"
+          ],
+          "impact": "needs-confirmation",
+          "detail": "集成方案依赖客户侧系统版本与接口文档，当前材料缺少认证方式与限流策略说明，无法给出确定结论。",
+          "followUp": "索取影像系统接口清单完整版与联调环境信息",
+          "page": 18,
+          "heading": "5.2 与影像 / OA 系统集成",
+          "excerpt": "适配层开发需以客户侧接口文档为准；若客户系统版本较旧，可能需要额外的中间库同步方案。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 4,
+          "heading": "2.1 接口清单",
+          "excerpt": "42 个 REST 接口，Java / Python / Go / C# SDK。"
+        },
+        {
+          "page": 10,
+          "heading": "3.2 配额与并发",
+          "excerpt": "默认 200 QPS，异步批量单任务 10 万页，可扩容。"
+        },
+        {
+          "page": 18,
+          "heading": "5.2 与影像 / OA 系统集成",
+          "excerpt": "适配层 + 事件回调模式，集成工作量 5-8 人日。"
+        }
+      ]
+    },
+    {
+      "id": "doc-audit",
+      "productName": "星云智能审核",
+      "docTitle": "星云智能审核产品能力说明",
+      "docType": "产品文档",
+      "version": "v1.8",
+      "updatedAt": "2026-06-11",
+      "capabilityTags": [
+        "audit",
+        "rule-engine",
+        "compliance-check",
+        "ticket",
+        "standard-ticket",
+        "bank-receipt"
+      ],
+      "description": "规则 + 模型双引擎的票据合规审核能力，标准票据类型库与规则可视化配置。",
+      "supportedScope": [
+        "可视化规则配置（字段校验、勾稽关系、阈值告警）",
+        "标准票据类型库：7 类常见票据",
+        "输出审核结论、命中规则与依据"
+      ],
+      "limitations": [
+        "特殊票据需定制扩展",
+        "跨系统勾稽规则需项目配置"
+      ],
+      "deployment": [
+        "私有化部署",
+        "公有云 API"
+      ],
+      "apiCapabilities": [
+        "REST 接口",
+        "规则导入导出",
+        "审核结果回调"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "audit",
+            "rule-engine",
+            "compliance-check"
+          ],
+          "scope": "可视化规则引擎，规则变更无需发版",
+          "page": 13,
+          "heading": "3.1 规则引擎",
+          "excerpt": "支持可视化规则配置（字段校验、勾稽关系、阈值告警），规则变更无需发版，支持版本管理与灰度。"
+        },
+        {
+          "tags": [
+            "ticket",
+            "standard-ticket",
+            "bank-receipt"
+          ],
+          "scope": "标准票据类型库覆盖 7 类票据",
+          "page": 7,
+          "heading": "2.2 票据类型覆盖",
+          "excerpt": "标准票据类型库覆盖：增值税专用 / 普通发票、电子发票、机票行程单、火车票、出租车票、定额发票、银行回单等 7 类。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "special-ticket"
+          ],
+          "impact": "gap",
+          "detail": "财政电子票据、海关缴款书、非标准银行回单等特殊票据不在标准类型库内，需定制模型或规则扩展，当前无开箱即用能力。",
+          "followUp": "确认特殊票据清单与样本量，评估定制工作范围",
+          "page": 21,
+          "heading": "5.1 覆盖范围之外",
+          "excerpt": "标准类型库之外的单据需通过定制模型或规则扩展实现，短期内无开箱即用能力。"
+        },
+        {
+          "tags": [
+            "rule-custom"
+          ],
+          "impact": "limitation",
+          "detail": "复杂业务规则（跨系统勾稽）需要交付团队配置，约 2-3 人日 / 规则组。",
+          "page": 13,
+          "heading": "3.1 规则引擎",
+          "excerpt": "跨系统勾稽规则需项目化配置，不包含在产品默认规则中。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 7,
+          "heading": "2.2 票据类型覆盖",
+          "excerpt": "标准类型库覆盖增值税发票、行程单、火车票等 7 类票据。"
+        },
+        {
+          "page": 13,
+          "heading": "3.1 规则引擎",
+          "excerpt": "可视化规则配置，支持版本管理与灰度。"
+        },
+        {
+          "page": 21,
+          "heading": "5.1 覆盖范围之外",
+          "excerpt": "财政电子票据、海关缴款书等需定制扩展。"
+        }
+      ]
+    },
+    {
+      "id": "doc-multilang",
+      "productName": "星云多语言增强包",
+      "docTitle": "星云多语言增强包（Beta）技术说明",
+      "docType": "技术文档",
+      "version": "v0.9",
+      "updatedAt": "2026-04-15",
+      "capabilityTags": [
+        "multi-language",
+        "korean",
+        "thai",
+        "beta",
+        "gpu-extra"
+      ],
+      "description": "韩语、泰语等扩展语种的 Beta 识别模型，及其精度与部署限制。",
+      "supportedScope": [
+        "韩语、泰语 Beta 模型",
+        "中文混排场景识别",
+        "独立容器与模型仓库"
+      ],
+      "limitations": [
+        "无 SLA 与批量交付承诺",
+        "需额外 GPU 资源",
+        "未在客户生产环境批量交付"
+      ],
+      "deployment": [
+        "私有化部署（附加组件）"
+      ],
+      "apiCapabilities": [
+        "复用标准 OCR REST 接口",
+        "统一任务队列"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "multi-language",
+            "korean",
+            "thai"
+          ],
+          "scope": "韩语 / 泰语 Beta 识别能力",
+          "page": 3,
+          "heading": "1.2 支持语种",
+          "excerpt": "Beta 支持语种：韩语、泰语；模型在 30 万张公开票据样本上训练，可支持中文混排场景。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "korean"
+          ],
+          "impact": "needs-confirmation",
+          "detail": "韩语 Beta 模型字段级准确率 94%-96%，未达到正式版 SLA，也未在客户生产环境批量交付。",
+          "followUp": "与产品线确认韩语能否纳入本期交付范围及验收口径",
+          "page": 6,
+          "heading": "3.1 精度与限制",
+          "excerpt": "Beta 阶段不提供准确率 SLA 与批量交付承诺，建议先做样本范围 POC。"
+        },
+        {
+          "tags": [
+            "korean",
+            "gpu-extra"
+          ],
+          "impact": "limitation",
+          "detail": "多语言增强包需独立 GPU 资源（每节点额外 1×GPU）与独立模型仓库。",
+          "page": 9,
+          "heading": "4.1 部署要求",
+          "excerpt": "多语言增强包与标准 OCR 服务分容器部署，需要额外的 GPU 与磁盘资源。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 3,
+          "heading": "1.2 支持语种",
+          "excerpt": "Beta 支持韩语、泰语，可识别中文混排。"
+        },
+        {
+          "page": 6,
+          "heading": "3.1 精度与限制",
+          "excerpt": "韩语准确率 94%-96%，无 SLA 承诺。"
+        },
+        {
+          "page": 9,
+          "heading": "4.1 部署要求",
+          "excerpt": "需额外 1×GPU / 节点与独立模型仓库。"
+        }
+      ]
+    },
+    {
+      "id": "doc-delivery",
+      "productName": "星云交付服务",
+      "docTitle": "星云交付服务标准",
+      "docType": "交付文档",
+      "version": "v2.0",
+      "updatedAt": "2026-07-28",
+      "capabilityTags": [
+        "delivery",
+        "customization",
+        "sla",
+        "on-site",
+        "training",
+        "acceptance"
+      ],
+      "description": "实施周期、服务等级、验收方法与定制开发流程。",
+      "supportedScope": [
+        "标准实施周期 6-8 周",
+        "99.5% SLA 与 7×24 故障响应",
+        "准确率调优与验收测试支持"
+      ],
+      "limitations": [
+        "定制开发需合同前评估",
+        "含定制与信创适配的周期约 4-5 个月"
+      ],
+      "deployment": [
+        "现场实施",
+        "远程实施"
+      ],
+      "apiCapabilities": [
+        "项目周报接口（交付管理平台）"
+      ],
+      "signals": [
+        {
+          "tags": [
+            "delivery",
+            "sla",
+            "on-site"
+          ],
+          "scope": "标准 SLA 与驻场支持",
+          "page": 8,
+          "heading": "3.1 服务等级",
+          "excerpt": "标准版 SLA：99.5% 可用性、7×24 故障响应（P1 30 分钟响应）；驻场支持按人月采购。"
+        },
+        {
+          "tags": [
+            "acceptance",
+            "accuracy"
+          ],
+          "scope": "准确率验收方法",
+          "page": 11,
+          "heading": "4.2 验收方法",
+          "excerpt": "准确率验收采用“客户抽检 + 评测集”双轨方式，评测集需在项目启动阶段双方确认并冻结。"
+        }
+      ],
+      "constraintSignals": [
+        {
+          "tags": [
+            "customization"
+          ],
+          "impact": "limitation",
+          "detail": "定制开发（含新票据类型）需在合同前完成需求评审与工作量评估，标准交付周期不含定制。",
+          "followUp": "确认项目是否允许定制开发及预算口径",
+          "page": 11,
+          "heading": "4.1 定制开发流程",
+          "excerpt": "定制需求经评审后单独报价，实施周期通常增加 6-10 周。"
+        },
+        {
+          "tags": [
+            "timeline-4months"
+          ],
+          "impact": "limitation",
+          "detail": "标准实施 6-8 周；若含定制模型训练与信创环境适配，整体周期约 4-5 个月。",
+          "page": 12,
+          "heading": "5.1 实施周期",
+          "excerpt": "含定制训练与信创适配的项目实施周期通常为 4-5 个月，需与客户时间计划对齐。"
+        }
+      ],
+      "pages": [
+        {
+          "page": 8,
+          "heading": "3.1 服务等级",
+          "excerpt": "99.5% SLA，P1 故障 30 分钟响应。"
+        },
+        {
+          "page": 11,
+          "heading": "4.2 验收方法",
+          "excerpt": "客户抽检 + 评测集双轨验收，评测集启动阶段冻结。"
+        },
+        {
+          "page": 12,
+          "heading": "5.1 实施周期",
+          "excerpt": "标准 6-8 周；含定制与信创适配约 4-5 个月。"
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "case-bank",
+      "name": "XX 银行票据识别项目",
+      "industry": "银行 / 金融",
+      "customerBackground": "全国性股份制银行省分行，票据中心日均处理约 60 万页，原有 OCR 为公有云 API，无法满足数据不出域与峰值并发要求。",
+      "customerNeeds": [
+        "票据识别私有化部署，数据不出行内机房",
+        "日均 60 万页、峰值 300 QPS 的处理能力",
+        "增值税发票、行程单、火车票等 8 类票据字段级识别",
+        "关键字段准确率 ≥ 99%（按客户评测集验收）"
+      ],
+      "products": [
+        "星云 OCR",
+        "星云企业版",
+        "星云 API",
+        "星云交付服务"
+      ],
+      "solution": "8 节点 GPU 集群私有化部署（麒麟 V10 + 鲲鹏），票据识别走异步批量通道，核心业务走优先队列；针对客户票据样本进行 3 轮模型调优，并冻结 5,000 页评测集用于验收。",
+      "results": [
+        "上线后日均处理 58 万页，峰值 320 QPS 稳定运行",
+        "关键字段准确率 99.2%，通过客户评测集验收",
+        "人工录入工作量下降约 70%"
+      ],
+      "reusableLessons": [
+        "私有化集群容量模型可按“页型 × 单页耗时”折算，避免只按日均页数估算节点",
+        "准确率验收必须在项目启动阶段冻结评测集与字段口径",
+        "票据类业务建议核心链路走优先队列，批量通道单独限流"
+      ],
+      "tags": [
+        "on-premise",
+        "offline",
+        "ocr",
+        "ticket",
+        "throughput",
+        "cluster-scale",
+        "concurrency",
+        "concurrency-200",
+        "accuracy",
+        "accuracy-99",
+        "kylin",
+        "kunpeng",
+        "xinchuang",
+        "bank"
+      ],
+      "scale": "8 节点集群 / 日均 60 万页",
+      "duration": "实施 9 周（含调优 3 周）",
+      "evidence": {
+        "id": "case-bank-e1",
+        "sourceType": "case",
+        "documentName": "XX 银行票据识别项目案例",
+        "page": 4,
+        "heading": "项目结果",
+        "excerpt": "私有化 8 节点集群上线后日均处理 58 万页，关键字段准确率 99.2%；项目与本次需求在“私有化部署 + 高并发票据 OCR”方面高度相似。"
+      }
+    },
+    {
+      "id": "case-manufacturing",
+      "name": "XX 制造企业文档数字化项目",
+      "industry": "离散制造",
+      "customerBackground": "大型装备制造企业，工艺文件、质检报告、采购单据分散在 12 个系统中，需要统一数字化并写入 SAP。",
+      "customerNeeds": [
+        "PDF、Word、Excel、扫描件统一解析",
+        "图纸与工艺文件版面还原、表格结构化",
+        "结果自动写入 SAP 与档案系统",
+        "支持离线环境部署"
+      ],
+      "products": [
+        "星云文档解析",
+        "星云 OCR",
+        "星云 API",
+        "星云企业版"
+      ],
+      "solution": "文档解析 + OCR 组合流水线，通过适配层对接 SAP，解析结果以结构化 JSON 回写；对复杂表格设置人工复核队列，保证关键字段零错误。",
+      "results": [
+        "日均解析 12 万页文档，结构化成功率 97.4%",
+        "档案检索时间从平均 15 分钟下降到 30 秒内",
+        "复杂表格人工复核比例控制在 6% 以内"
+      ],
+      "reusableLessons": [
+        "与 ERP / 档案系统集成建议采用适配层 + 回调，避免直接改造客户核心系统",
+        "复杂表格必须设计人工复核兜底流程，不能按 100% 自动化承诺"
+      ],
+      "tags": [
+        "document-parse",
+        "pdf",
+        "office",
+        "excel",
+        "scanned",
+        "table",
+        "api",
+        "integration",
+        "archive"
+      ],
+      "scale": "日均 12 万页 / 12 个业务系统",
+      "duration": "实施 7 周",
+      "evidence": {
+        "id": "case-manufacturing-e1",
+        "sourceType": "case",
+        "documentName": "XX 制造企业文档数字化项目案例",
+        "page": 5,
+        "heading": "解决方案",
+        "excerpt": "文档解析与 OCR 组合流水线，通过适配层与 SAP 集成；复杂表格设置人工复核队列，结构化成功率 97.4%。"
+      }
+    },
+    {
+      "id": "case-retail",
+      "name": "XX 零售企业 OCR 项目",
+      "industry": "零售连锁",
+      "customerBackground": "全国连锁零售企业，门店小票、营业执照、身份证等单据由总部集中审核，原有系统在促销季频繁超时。",
+      "customerNeeds": [
+        "标准 API 接入现有审核平台",
+        "峰值 300 QPS 并发，促销季弹性扩容",
+        "小票与卡证识别，识别结果实时回写"
+      ],
+      "products": [
+        "星云 OCR",
+        "星云 API",
+        "星云智能审核"
+      ],
+      "solution": "按“识别 API + 异步批量通道”双通道接入，配置限流与重试策略；促销季通过临时扩容识别节点承载峰值流量。",
+      "results": [
+        "峰值 340 QPS 无超时",
+        "单据审核时效从 4 小时缩短到 20 分钟",
+        "扩容操作无需停机"
+      ],
+      "reusableLessons": [
+        "接口集成需提前约定限流、重试与幂等策略",
+        "峰值业务建议预留 1.5 倍并发余量，并演练扩容流程"
+      ],
+      "tags": [
+        "ocr",
+        "api",
+        "integration",
+        "concurrency",
+        "concurrency-200",
+        "retail",
+        "receipt",
+        "card"
+      ],
+      "scale": "峰值 340 QPS",
+      "duration": "实施 5 周",
+      "evidence": {
+        "id": "case-retail-e1",
+        "sourceType": "case",
+        "documentName": "XX 零售企业 OCR 项目案例",
+        "page": 3,
+        "heading": "项目结果",
+        "excerpt": "按 API + 异步批量双通道接入，峰值 340 QPS 无超时；扩容方案在促销季前完成演练。"
+      }
+    },
+    {
+      "id": "case-government",
+      "name": "XX 政务文档解析项目",
+      "industry": "政务 / 公共事业",
+      "customerBackground": "省级政务服务中心，需在完全离线的信创环境中完成公文与申报材料解析，并通过等保三级测评。",
+      "customerNeeds": [
+        "全离线部署，数据不出政务外网",
+        "麒麟 V10 + 鲲鹏 920 信创环境适配",
+        "完整审计日志，留存 6 个月以上",
+        "公文版式解析与要素提取"
+      ],
+      "products": [
+        "星云文档解析",
+        "星云企业版",
+        "星云交付服务"
+      ],
+      "solution": "5 节点信创集群全离线部署，采用离线镜像仓库升级；审计日志通过 Syslog 对接政务日志平台；配合客户完成等保三级测评材料准备。",
+      "results": [
+        "通过等保三级测评",
+        "日均解析 8 万页公文材料",
+        "离线升级 3 次无业务中断"
+      ],
+      "reusableLessons": [
+        "信创项目需在 POC 阶段验证 OS + CPU + 数据库组合，不能只参考适配矩阵",
+        "审计日志格式建议在实施前与客户安全部门确认"
+      ],
+      "tags": [
+        "on-premise",
+        "offline",
+        "xinchuang",
+        "kylin",
+        "kunpeng",
+        "domestic-stack",
+        "audit-log",
+        "security",
+        "data-residency",
+        "mlps",
+        "document-parse"
+      ],
+      "scale": "5 节点信创集群 / 日均 8 万页",
+      "duration": "实施 11 周",
+      "evidence": {
+        "id": "case-government-e1",
+        "sourceType": "case",
+        "documentName": "XX 政务文档解析项目案例",
+        "page": 6,
+        "heading": "可复用经验",
+        "excerpt": "全离线信创集群（麒麟 V10 + 鲲鹏 920）通过等保三级测评；审计日志对接与离线升级流程均已沉淀为交付模板。"
+      }
+    },
+    {
+      "id": "case-multinational",
+      "name": "XX 跨国企业多语言文档项目",
+      "industry": "跨国贸易",
+      "customerBackground": "跨国贸易集团，亚太区单据包含中文、英文、日文、韩文四种语言，原有多语言识别依赖海外 SaaS，存在合规风险。",
+      "customerNeeds": [
+        "中日英三语正式支持，韩语试点验证",
+        "私有化部署，避免单据外流",
+        "与现有档案系统集成，识别结果自动归档"
+      ],
+      "products": [
+        "星云 OCR",
+        "星云多语言增强包",
+        "星云文档解析"
+      ],
+      "solution": "中文、英文、日文走标准 OCR 服务；韩语使用多语言增强包（Beta）在独立 GPU 节点做样本范围 POC；POC 结论未达到批量上线标准，最终韩语单据仍保留人工复核。",
+      "results": [
+        "中日英三语识别准确率 98.4%，按期上线",
+        "韩语 POC 准确率 94.8%，未纳入批量生产流程",
+        "单据外流合规风险消除"
+      ],
+      "reusableLessons": [
+        "多语言需求必须逐语种确认支持状态与验收口径，避免整体承诺",
+        "Beta 语种建议先做样本 POC，结论写入方案风险项"
+      ],
+      "tags": [
+        "multi-language",
+        "korean",
+        "zh",
+        "en",
+        "ja",
+        "beta",
+        "document-parse",
+        "on-premise"
+      ],
+      "scale": "4 种语言 / 日均 3 万页",
+      "duration": "实施 8 周（含韩语 POC 2 周）",
+      "evidence": {
+        "id": "case-multinational-e1",
+        "sourceType": "case",
+        "documentName": "XX 跨国企业多语言文档项目案例",
+        "page": 7,
+        "heading": "可复用经验",
+        "excerpt": "中日英为正式支持能力；韩语（Beta）POC 准确率 94.8%，未达批量上线标准，最终保留人工复核流程。"
+      }
+    }
+  ]
+}

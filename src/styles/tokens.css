@@ -1,0 +1,95 @@
+/**
+ * Fitwise 设计令牌（v2 · 简约企业级）
+ *
+ * 原则：
+ * 1. 一个强调色（蓝）+ 中性灰阶；状态色只用于徽标与色条，不铺满整块背景；
+ * 2. 表面层级靠「浅背景 + 细边框」，不靠阴影堆叠；
+ * 3. 圆角收敛到 6/8/12，正文 13-14px，数字统一等宽。
+ */
+:root {
+  /* ---- 中性色 ---- */
+  --color-background: #f7f7f9;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f4f8;
+  --color-surface-3: #e9eef5;
+  --color-foreground: #0f172a;
+  --color-primary: #0f172a;
+  --color-primary-soft: #1e293b;
+  --color-secondary: #3f4c5f;
+  --color-muted-foreground: #5b6777;
+  /* 小字灰阶：≥4.5:1 对比度，11–12px 的说明文字也能看清 */
+  --color-tertiary-foreground: #68727f;
+  --color-muted: #f1f4f8;
+  --color-border: #e9e9ee;
+  --color-border-soft: #f1f1f4;
+  --color-border-strong: #dcdce3;
+  --color-card: #ffffff;
+  --color-divider: #eef1f5;
+  --color-ring: #2563eb;
+
+  /* ---- 强调色 ---- */
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-soft: #eef4ff;
+  --color-accent-border: #cddffd;
+  --color-destructive: #b42318;
+
+  /* ---- 状态色 ---- */
+  --status-full-fg: #0e7c66;
+  --status-full-bg: #eaf7f3;
+  --status-full-border: #c7e9e0;
+  --status-partial-fg: #9a6700;
+  --status-partial-bg: #fff8e6;
+  --status-partial-border: #f3e2b3;
+  --status-none-fg: #b42318;
+  --status-none-bg: #fef3f2;
+  --status-none-border: #f6d5d2;
+  --status-unknown-fg: #475569;
+  --status-unknown-bg: #f1f5f9;
+  --status-unknown-border: #dde4ec;
+
+  /* ---- 排版 ---- */
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', 'Noto Sans SC', 'Hiragino Sans GB', sans-serif;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --leading-tight: 1.35;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+
+  /* ---- 间距 ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+
+  /* ---- 形态 ---- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 999px;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.18);
+
+  /* ---- 尺寸 ---- */
+  --sidebar-width: 232px;
+  --agent-rail-width: 332px;
+  --content-max: 1240px;
+  --transition-fast: 140ms ease;
+  --transition-base: 200ms ease;
+}

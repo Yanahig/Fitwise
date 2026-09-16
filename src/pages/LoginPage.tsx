@@ -46,7 +46,7 @@ export function LoginPage() {
           </div>
         </div>
 
-        <p className="login__promise">把客户材料交给我，30 分钟出「要什么 · 能不能做 · 下一步」初稿。</p>
+        <p className="login__promise">把客户材料交给我，出「要什么 · 能不能做 · 下一步」初稿。</p>
 
         {error ? <p className="inline-error">{error}</p> : null}
 

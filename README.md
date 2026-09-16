@@ -112,7 +112,9 @@ src/
                         · ProjectContextBar（项目栏与证据抽屉）· AgentPanel
 scripts/                测试用 RFP 生成、端到端冒烟测试与沙箱回归（regression_check / uitest_sandbox）
                         check_ai_ledger（账本与重试自测）· check_trace_api（账本接口验收）
+                        make_testset_materials / check_testset（回归题库与效果评测，见 scripts/testset/README.md）
 docs/information-hierarchy.md  界面信息层级原则、逐页精简清单与后续待办
+docs/acceptance-checklist.md   答辩验收单：十项可当场验证的验收（怎么验 · 合格标准 · 不合格说明什么）
 ```
 
 ---
@@ -177,6 +179,10 @@ docs/information-hierarchy.md  界面信息层级原则、逐页精简清单与�
   `$env:FITWISE_SANDBOX_PORT="8021"; python scripts\regression_check.py --with-agent`。
 - **账本与重试自测**：`python scripts\check_ai_ledger.py`（不调模型、不碰真实库，覆盖账本汇总、
   失败成因码、回退留痕、解析重试）；`python scripts\check_trace_api.py`（对着实例跑，验账本数字与业务对得上）。
+- **效果评测（题库）**：`python scripts\regression_check.py --testset` —— 在沙箱里拿 6 份固定材料各建一个项目，
+  走完整链路后算抽全率（阈值 80%）、越界率（必须 0）、证据覆盖（必须 100%）与需求条数区间。
+  材料与答题卡在 `scripts/testset/`（说明见该目录 README）。
+  想确认这套评测能判红：`python scripts\check_testset.py --only 01 --verify-red`。
   末尾会打两张**评测分数表**（链路 10 项 / 对话 5 项），其中最关键的是「越界检查：完全支持必须有支持证据」——
   它守的是这个产品的命门：结论不许比证据乐观。规则见 `scripts/scorecard.py`。
 - **UI 沙箱**：`python scripts\uitest_sandbox.py` —— 复制库并把项目重置到「基线已定、还没判断」，

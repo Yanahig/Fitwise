@@ -136,6 +136,17 @@ def main() -> int:
             if trace_check.returncode != 0:
                 print("\nRESULT: FAIL - 调用账本")
                 return trace_check.returncode
+
+        if "--testset" in sys.argv:
+            print("\n--- 效果评测（题库） ---")
+            testset_check = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "check_testset.py")],
+                env=smoke_env,
+                cwd=str(ROOT),
+            )
+            if testset_check.returncode != 0:
+                print("\nRESULT: FAIL - 效果评测")
+                return testset_check.returncode
         return 0
     finally:
         server.terminate()

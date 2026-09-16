@@ -20,6 +20,10 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from scorecard import check, norm, print_scorecard  # noqa: E402
+
 BASE = os.environ.get("FITWISE_BASE", "http://127.0.0.1:8000")
 SCRIPT_DIR = Path(__file__).resolve().parent
 RFP = SCRIPT_DIR / "test-rfp.pdf"
@@ -45,38 +49,6 @@ def wait_job(client: httpx.Client, job_id: str, label: str, timeout: int = 300) 
             return job
         time.sleep(2)
     raise TimeoutError(f"{label} 超时")
-
-
-# --------------------------------------------------------------------------- #
-# 评测分数表
-#
-# 跑完链路只是"没坏"；这张表回答的是"这一版 Agent 的硬性质还在不在"：
-#   ① 证据化：每条结论都能回指真实文档 + 页码
-#   ② 不比证据乐观：结论是「完全支持」就必须有支持类证据（越界率必须为 0）
-#   ③ 建议可用：三组行动非空、对客与内部不重复、风险有轻重
-# --------------------------------------------------------------------------- #
-
-CHECKS: list[tuple[str, bool, str]] = []
-
-
-def check(name: str, ok: bool, detail: str = "") -> bool:
-    CHECKS.append((name, ok, detail))
-    print(f"   {'✓' if ok else '✗'} {name}" + (f"：{detail}" if detail else ""))
-    return ok
-
-
-def norm(text: str) -> str:
-    return "".join((text or "").split())
-
-
-def print_scorecard() -> int:
-    print("\n================ 评测分数表 ================")
-    for name, ok, detail in CHECKS:
-        print(f"[{'OK' if ok else 'XX'}] {name}" + (f"｜{detail}" if detail else ""))
-    failed = [name for name, ok, _ in CHECKS if not ok]
-    passed = len(CHECKS) - len(failed)
-    print(f"\n结果：{passed}/{len(CHECKS)} 通过" + ("（全部通过 ✅）" if not failed else f"；未过：{'、'.join(failed)}"))
-    return 1 if failed else 0
 
 
 def _run() -> int:
@@ -181,6 +153,7 @@ def _run() -> int:
     print(f"8. 匹配结果：{result['result']}")
 
     matches = client.get(f"/api/projects/{pid}/matches").json()
+    details = []
     for item in matches[:5]:
         detail = client.get(f"/api/matches/{item['id']}").json()
         evidences = detail.get("evidences", [])
@@ -191,6 +164,39 @@ def _run() -> int:
         if evidences:
             first = evidences[-1]
             print(f"     依据：{first['document_name']} P{first['page']}｜{first['excerpt'][:50]}")
+
+    # ② 判断层：结论不能比证据乐观 —— 这是这个产品最要紧的一条，必须每次回归都验
+    for item in matches:
+        details.append(client.get(f"/api/matches/{item['id']}").json())
+
+    over_optimistic, no_evidence, no_page = [], [], []
+    for detail in details:
+        evidences = detail.get("evidences") or []
+        capability = [row for row in evidences if row.get("source_type") == "capability"]
+        status = detail["status"]
+        if status == "full" and not capability:
+            over_optimistic.append(detail["requirement"]["title"])
+        if status != "unknown" and not evidences:
+            no_evidence.append(detail["requirement"]["title"])
+        if any(not row.get("page") for row in evidences):
+            no_page.append(detail["requirement"]["title"])
+
+    check(
+        "越界检查：完全支持必须有支持证据",
+        not over_optimistic,
+        f"越界 {len(over_optimistic)} 条：{'、'.join(over_optimistic[:3])}" if over_optimistic else "0 条越界",
+    )
+    check(
+        "非待补依据的结论都有证据",
+        not no_evidence,
+        f"无证据 {len(no_evidence)} 条：{'、'.join(no_evidence[:3])}" if no_evidence else "",
+    )
+    check("证据都能落到页码", not no_page, f"{len(no_page)} 条缺页码" if no_page else "")
+
+    statuses: dict[str, int] = {}
+    for detail in details:
+        statuses[detail["status"]] = statuses.get(detail["status"], 0) + 1
+    print(f"   结论分布：{statuses}")
 
     job = client.post(
         f"/api/projects/{pid}/solutions/generate",
@@ -222,6 +228,14 @@ def _run() -> int:
         print("   风险依据链：✗ 没有任何风险挂上依据（_attach_requirement_ids 没生效）")
         return 1
 
+    check(
+        "风险都能回指判断与证据",
+        len(with_basis) == len(solution["risks"]),
+        f"{len(with_basis)}/{len(solution['risks'])} 条",
+    )
+    levels = {item["level"] for item in solution["risks"]}
+    check("风险有轻重之分", "high" in levels, f"等级：{'、'.join(sorted(levels))}")
+
     print(
         f"10. 行动建议（只在方案里，不再落成待办）："
         f"要问客户 {len(solution['ask_customer'])} 条、要问内部 {len(solution['ask_internal'])} 条、"
@@ -230,6 +244,17 @@ def _run() -> int:
     for item in solution["ask_customer"][:2]:
         print(f"   - 要问客户：{item[:50]}")
 
+    # ③ 建议层：三组都要有东西，而且对客组不能混进内部问题
+    check(
+        "三组行动都非空",
+        all([solution["ask_customer"], solution["ask_internal"], solution["next_actions"]]),
+        f"客户 {len(solution['ask_customer'])} / 内部 {len(solution['ask_internal'])} / 动作 {len(solution['next_actions'])}",
+    )
+    ask_customer_norm = {norm(item) for item in solution["ask_customer"]}
+    ask_internal_norm = {norm(item.get("question", "")) for item in solution["ask_internal"]}
+    overlap = ask_customer_norm & ask_internal_norm
+    check("对客与内部问题不重复", not overlap, f"重复 {len(overlap)} 条" if overlap else "")
+
     customers = client.get("/api/customers").json()
     board = client.get("/api/dashboard").json()
     print(
@@ -237,8 +262,18 @@ def _run() -> int:
         f"进行中项目 {len(board['projects'])} 个｜最近动态 {len(board['activities'])} 条"
     )
 
-    print("\n端到端链路验证完成 ✅")
     return 0
+
+
+def main() -> int:
+    """跑链路 + 打分数表：链路中途失败也把已经跑出来的检查项列出来。"""
+    try:
+        code = _run()
+    except Exception as error:  # noqa: BLE001
+        check("脚本执行到结束", False, f"{type(error).__name__}: {str(error)[:80]}")
+        code = 1
+    failed = print_scorecard()
+    return 1 if (code or failed) else 0
 
 
 if __name__ == "__main__":

@@ -12,8 +12,13 @@ from __future__ import annotations
 import os
 import sys
 import time
+from pathlib import Path
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from scorecard import check, print_scorecard  # noqa: E402
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -124,23 +129,27 @@ def main() -> int:
     approval_data = (decided.get("data") or {}).get("approval") or {}
     print(f"7. 留痕：decision={approval_data.get('decision')} by={approval_data.get('by')} at={'有' if approval_data.get('at') else '无'}")
 
-    problems: list[str] = []
-    if len(final) - len(before) != 3:
-        problems.append(f"新增消息数不对：{len(final) - len(before)}")
-    if not any(item["role"] == "agent" and item["data"].get("citations") for item in final):
-        problems.append("回答的引用没有落库")
-    if not any(item["role"] == "tool" and item["data"].get("status") == "done" for item in final):
-        problems.append("回执卡状态没更新")
-    if prepared["kind"] != "approval":
-        problems.append("确认需求没有走待批准")
-    if approval_data.get("decision") != "declined" or not approval_data.get("by"):
-        problems.append("批准留痕没写上")
-
-    if problems:
-        print("RESULT: FAIL - " + "; ".join(problems))
-        return 1
-    print("RESULT: PASS - 提问落库、引用可读回、回执卡可建可更新")
-    return 0
+    # ④ 对话层：提问要落库、回答要带引用、回执卡要能走完、需要人承诺的动作必须走批准卡
+    check(
+        "提问与回执卡都落库",
+        len(final) - len(before) == 3,
+        f"新增 {len(final) - len(before)} 条消息",
+    )
+    check(
+        "回答带引用并落库",
+        any(item["role"] == "agent" and item["data"].get("citations") for item in final),
+    )
+    check(
+        "回执卡能更新成完成",
+        any(item["role"] == "tool" and item["data"].get("status") == "done" for item in final),
+    )
+    check("确认需求走批准卡（不自己执行）", prepared["kind"] == "approval", f"kind={prepared['kind']}")
+    check(
+        "批准留痕由服务端写",
+        approval_data.get("decision") == "declined" and bool(approval_data.get("by")),
+        f"decision={approval_data.get('decision')} by={approval_data.get('by')}",
+    )
+    return print_scorecard("对话与审批分数表")
 
 
 if __name__ == "__main__":

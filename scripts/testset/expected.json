@@ -1,0 +1,91 @@
+{
+  "version": "2026-09-16.1",
+  "note": "回归题库的答题卡：材料固定，所以抽全率与越界率才可复现。must_extract 的命中范围是「需求 + 项目要点」——关键信息落成哪一类都算读出来了。",
+  "materials": [
+    {
+      "file": "01-招标需求书.pdf",
+      "project_name": "效果评测 · 长材料（招标需求书）",
+      "expect_parse": "parsed",
+      "min_requirements": 6,
+      "max_requirements": 40,
+      "must_extract": [
+        "工期",
+        "准确率",
+        "内网",
+        "信创",
+        "图纸",
+        "日均"
+      ],
+      "must_not_full_support": [
+        "大幅面",
+        "图纸"
+      ],
+      "notes": "关键约束在第 8 节（后段）：考抽全率与「埋得深」；大幅面图纸必须命中能力缺口"
+    },
+    {
+      "file": "02-答疑与补充通知.pdf",
+      "project_name": "效果评测 · 答疑（口径冲突）",
+      "expect_parse": "parsed",
+      "min_requirements": 2,
+      "max_requirements": 30,
+      "must_extract": [
+        "工期",
+        "装订"
+      ],
+      "must_not_full_support": [],
+      "notes": "与 01 配合：工期 6 个月 → 4 个月，考口径冲突能不能被抓到并转成待确认"
+    },
+    {
+      "file": "03-客户往来邮件.txt",
+      "project_name": "效果评测 · 邮件（无页码材料）",
+      "expect_parse": "parsed",
+      "min_requirements": 1,
+      "max_requirements": 8,
+      "must_extract": [
+        "联调"
+      ],
+      "must_not_full_support": [],
+      "notes": "寒暄里夹一条真正的变更；不能把「川菜馆」这类内容抽成需求（用条数上限兜住噪音）"
+    },
+    {
+      "file": "04-扫描件.pdf",
+      "project_name": "效果评测 · 扫描件（无文字层）",
+      "expect_parse": "parsed|failed",
+      "min_requirements": 0,
+      "max_requirements": 30,
+      "must_extract": [],
+      "must_not_full_support": [],
+      "notes": "OCR 读出来算过，读不出来也必须明确失败并给成因 —— 不许「已读完但内容为空」"
+    },
+    {
+      "file": "05-超范围需求清单.pdf",
+      "project_name": "效果评测 · 超范围需求（不能比证据乐观）",
+      "expect_parse": "parsed",
+      "min_requirements": 3,
+      "max_requirements": 20,
+      "must_extract": [
+        "图纸",
+        "OFD"
+      ],
+      "must_not_full_support": [
+        "图纸",
+        "台账",
+        "OFD",
+        "繁体",
+        "50 万",
+        "50万"
+      ],
+      "notes": "五条硬要求全部超出或接近能力边界：越界率必须为 0（一条都不许判成完全支持）"
+    },
+    {
+      "file": "06-损坏文件.pdf",
+      "project_name": "效果评测 · 损坏文件（明确失败）",
+      "expect_parse": "failed",
+      "min_requirements": 0,
+      "max_requirements": 0,
+      "must_extract": [],
+      "must_not_full_support": [],
+      "notes": "解析失败必须带成因码前缀，且不允许产出需求"
+    }
+  ]
+}

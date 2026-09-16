@@ -5,7 +5,10 @@ dist
 .vite
 .venv
 server/.venv
-server/.env
+# 凭据文件：任何位置的 .env 都不提交，只提交 .env.example 占位符模板
+.env
+.env.*
+!.env.example
 server/data
 .tmp
 __pycache__

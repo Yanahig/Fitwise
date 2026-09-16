@@ -179,6 +179,9 @@ docs/acceptance-checklist.md   答辩验收单：十项可当场验证的验收�
   `$env:FITWISE_SANDBOX_PORT="8021"; python scripts\regression_check.py --with-agent`。
 - **账本与重试自测**：`python scripts\check_ai_ledger.py`（不调模型、不碰真实库，覆盖账本汇总、
   失败成因码、回退留痕、解析重试）；`python scripts\check_trace_api.py`（对着实例跑，验账本数字与业务对得上）。
+- **提交前自检密钥**：`python scripts\check_no_secrets.py` —— 查三件事：待提交列表里有没有 .env 类文件、
+  `server/.env` 里的真实密钥有没有被复制到代码里、有没有 sk- / ghp_ / AKIA / 私钥头这类硬编码。
+  `.gitignore` 只防"文件名"，防不住"密钥被复制到别的文件"，两条一起才闭合。它只打印命中的文件名，不打印密钥内容。
 - **效果评测（题库）**：`python scripts\regression_check.py --testset` —— 在沙箱里拿 6 份固定材料各建一个项目，
   走完整链路后算抽全率（阈值 80%）、越界率（必须 0）、证据覆盖（必须 100%）与需求条数区间。
   材料与答题卡在 `scripts/testset/`（说明见该目录 README）。

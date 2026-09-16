@@ -114,7 +114,7 @@ scripts/                测试用 RFP 生成、端到端冒烟测试与沙箱回
                         check_ai_ledger（账本与重试自测）· check_trace_api（账本接口验收）
                         make_testset_materials / check_testset（回归题库与效果评测，见 scripts/testset/README.md）
 docs/information-hierarchy.md  界面信息层级原则、逐页精简清单与后续待办
-docs/acceptance-checklist.md   答辩验收单：十项可当场验证的验收（怎么验 · 合格标准 · 不合格说明什么）
+docs/acceptance-checklist.md   验收清单：十项可当场验证的验收（怎么验 · 合格标准 · 不合格说明什么）
 ```
 
 ---

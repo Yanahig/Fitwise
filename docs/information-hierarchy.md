@@ -1290,7 +1290,7 @@ job result 与日志都会带上，避免再出现"一条都没抽出来但没�
 
 现存的文档只剩四份，都在描述**当前**这个产品：`README.md`（总览与开发须知）、
 `docs/information-hierarchy.md`（信息层级与逐轮变更）、`docs/agent-core-design.md`（Agent 设计）、
-`docs/demo-script.md` + `docs/interview-notes.md`（演示与访谈）。
+`docs/demo-script.md`（演示脚本）。
 
 ### 38.2 对话检查加重试
 

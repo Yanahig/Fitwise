@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     # 服务与存储
     database_url: str = "sqlite:///./data/fitwise.db"
     storage_dir: str = "./data/uploads"
+    # 前端构建产物目录。留空 = 仓库根目录下的 dist；目录存在时由后端同源托管（单端口部署）
+    frontend_dir: str = ""
     jwt_secret: str = "fitwise-dev-secret-change-me"
     access_token_expire_minutes: int = 720
     cors_origins: str = "http://127.0.0.1:5183,http://localhost:5183"
@@ -57,6 +59,15 @@ class Settings(BaseSettings):
     def resolved_storage_dir(self) -> Path:
         path = Path(_resolve_path(self.storage_dir))
         path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
+    def resolved_frontend_dir(self) -> Path:
+        """前端构建产物目录；默认仓库根下的 dist，可用 FRONTEND_DIR 覆盖。"""
+        raw = self.frontend_dir.strip() or "dist"
+        path = Path(raw)
+        if not path.is_absolute():
+            path = (SERVER_DIR.parent / raw.lstrip("./")).resolve()
         return path
 
     @property

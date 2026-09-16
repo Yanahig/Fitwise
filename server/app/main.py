@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .routers import agent, analysis, auth, customers, dashboard, knowledge, materials, projects, traces
@@ -58,3 +59,12 @@ app.include_router(traces.router)
 @app.get("/api/health-check")
 def health_check() -> dict:
     return {"status": "ok", "parser": settings.textin_enabled, "llm": settings.llm_enabled}
+
+
+# 前端构建产物存在时由后端同源托管：单端口部署（前端与 API 同一个源）就不用配 CORS，
+# 也不会出现 https 页面调 http 接口被浏览器拦掉的情况。
+# 必须在所有 API 路由之后挂载，否则 "/" 会把 /api/*、/docs 一起吃掉。
+frontend_dir = settings.resolved_frontend_dir
+if frontend_dir.is_dir():
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+    logging.getLogger(__name__).info("已同源托管前端：%s", frontend_dir)

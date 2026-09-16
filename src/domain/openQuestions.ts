@@ -29,12 +29,22 @@ const LABELS: { label: string; test: RegExp }[] = [
   { label: '定制边界', test: /定制|变更|实施期/ },
   { label: '部署环境', test: /服务器|存储|信创|鲲鹏|达梦|版本|环境/ },
   { label: '集成对接', test: /接口|对接|联调|认证|限流|第三方/ },
-  { label: '票据范围', test: /哪几类|票据类型|票种|类型清单|票据清单/ },
+  { label: '范围清单', test: /哪几类|类型清单|票据清单|档案类型|票据类型|票种/ },
+  { label: '工期安排', test: /工期|项目周期|上线时间|初验|里程碑/ },
   { label: '处理规模', test: /峰值|并发|QPS|处理量|页数|占比/ },
 ];
 
 /** 只有这三类会改变需求判断本身，其余只影响承诺与交付口径 */
-const JUDGEMENT_LABELS = new Set(['集成对接', '票据范围', '处理规模']);
+const JUDGEMENT_LABELS = new Set(['集成对接', '范围清单', '处理规模']);
+
+/**
+ * 给一条行动建议/待确认项打左侧小标题：让人一眼看出"这条要确认的是什么"。
+ * 复用上面同一套关键词表；认不出来时用「细节确认」，不硬凑一个不准确的分类。
+ */
+export function actionLabel(text: string): string {
+  const matched = LABELS.find((item) => item.test.test(text || ''));
+  return matched?.label ?? '细节确认';
+}
 
 export function summarizeOpenQuestion(question: OpenQuestion): OpenQuestionInsight {
   /**

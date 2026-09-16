@@ -21,9 +21,7 @@ import {
 import { useToast } from '../Toast';
 import { HelpTip } from '../HelpTip';
 import {
-  IconAlert,
   IconArrowRight,
-  IconCheck,
   IconClose,
   IconEvidence,
   IconRefresh,
@@ -83,6 +81,21 @@ const TOOL_LABELS: Record<string, string> = {
   run_extraction: '整理需求',
   run_matching: '能力判断',
   compose_solution: '生成售前建议',
+};
+
+/** 下一步按钮的短文案：面板只有 300px 宽，长文案会把这一行撑坏 */
+const NEXT_STEP_ACTION: Record<string, string> = {
+  run_full_analysis: '跑一遍',
+  run_extraction: '整理需求',
+  run_matching: '做判断',
+  compose_solution: '写建议',
+  confirm_requirements: '去确认',
+};
+
+const NEXT_TARGET_ACTION: Record<string, string> = {
+  materials: '去材料页',
+  requirements: '去需求页',
+  judgement: '去看建议',
 };
 
 /** 落库消息 → 界面消息。读不出来的（比如材料已删）就丢掉，不硬渲染。 */
@@ -249,7 +262,11 @@ function MaterialCard({
         : [material.page_count ? `${material.page_count} 页` : '', '已读完'].filter(Boolean).join(' · ');
 
   return (
-    <div className={`agent-card agent-card--${tone}`}>
+    <div
+      className={`agent-card agent-card--${tone}${
+        material.status === 'parsed' ? ' agent-card--compact' : ''
+      }`}
+    >
       <div className="agent-card__head">
         <span className="agent-card__dot" aria-hidden="true" />
         <span className="asset-tag asset-tag--customer">
@@ -325,10 +342,10 @@ export function AgentPanel({
   refresh: () => Promise<void>;
 }) {
   const toast = useToast();
-  const [open, setOpen] = useState(false);
+  /** 默认展开（演示时观众能直接看到 Agent 在工作）；点标题栏的关闭按钮可收起，右下角按钮再呼出 */
+  const [open, setOpen] = useState(true);
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [pasting, setPasting] = useState(false);
   const [thinking, setThinking] = useState(false);
   /** 状态机给的下一步：能自动跑的就显示成可点的提示 */
   const [nextStep, setNextStep] = useState<AgentNextStep | null>(null);
@@ -351,8 +368,6 @@ export function AgentPanel({
   const gaps = matches.filter((item) => item.status === 'none');
   const unknown = matches.filter((item) => item.status === 'unknown');
   const partial = matches.filter((item) => item.status === 'partial');
-  const riskCount = gaps.length + unknown.length;
-
   /**
    * 结论按"项目走到哪一步"说，不能一口咬定还没读过材料 ——
    * 这段现在是常驻结论，说错了整块面板都不可信。
@@ -365,7 +380,7 @@ export function AgentPanel({
     : !confirmedRequirements.length
       ? '需求还没确认，判断先不下'
       : !matches.length
-        ? '需求基线已定，还没做能力判断'
+        ? '需求都确认了，还没做能力判断'
         : gaps.length
           ? '这个项目暂不建议直接承诺'
           : unknown.length
@@ -586,15 +601,6 @@ export function AgentPanel({
 
   const openRequirements = () => {
     window.location.hash = `/projects/${project.id}/requirements`;
-  };
-
-  const storePasted = () => {
-    const text = question.trim();
-    if (!text) return;
-    const stamp = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
-    setQuestion('');
-    setPasting(false);
-    void intake([new File([text], `聊天记录-${stamp}.txt`, { type: 'text/plain' })]);
   };
 
   /** 拖到页面任何位置都算交给 Agent（共用整页拖拽能力，工作台用的是同一套） */
@@ -871,7 +877,7 @@ export function AgentPanel({
         await refresh();
         setMessages((prev) => [
           ...prev,
-          { id: newId(), role: 'agent', text: `确认了 ${result.confirmed} 条需求，基线已更新。` },
+          { id: newId(), role: 'agent', text: `确认了 ${result.confirmed} 条需求，可以开始判断了。` },
         ]);
         // 确认需求之后后端会自动开始能力判断，跟着那个 job 走
         if (result.job_id) {
@@ -901,44 +907,39 @@ export function AgentPanel({
               text="回答只基于本项目的材料与结论、都能点回原文；也可以直接说「整理需求」「做判断」「写建议」。上传材料在「客户材料」页，或把文件拖进页面。"
             />
           </strong>
-          <span className="hint hint--inline">
-            {project.customer_name} · {project.name}
-          </span>
+          {/* 客户与项目名已经在中间页的项目栏里，这里不再重复 */}
         </div>
-        <button type="button" className="agent__close" aria-label="收起 Agent" onClick={() => setOpen(false)}>
-          <IconClose width={14} height={14} />
+        <button
+          type="button"
+          className="agent__close"
+          aria-label="收起 Agent"
+          title="收起 Agent，右下角按钮可以再打开"
+          onClick={() => setOpen(false)}
+        >
+          <IconClose width={13} height={13} />
+          收起
         </button>
       </header>
 
       <section className="agent__report">
-        <span className="agent__label">
-          项目状态
-          <span className="hint hint--inline">正在看：{report.watching}</span>
-        </span>
+        {/* 这里只说「整个项目该干什么」：页内结论与数字由中间页负责，避免两边说同一件事 */}
         <p className="agent__verdict">{report.verdict}</p>
-        {/* 空项目时只留一句话：结论 + 一条引导，不铺三行数字，第一屏才不显得重 */}
-        <ul className="agent__reasons">
-          {(materials.length ? [...new Set(report.reasons)] : report.reasons.slice(0, 1)).map((item) => (
-            <li key={item}>
-              <span className={`agent__tick${riskCount ? ' agent__tick--warn' : ''}`}>
-                {riskCount ? <IconAlert width={11} height={11} /> : <IconCheck width={11} height={11} />}
-              </span>
-              {item}
-            </li>
-          ))}
-        </ul>
-        {materials.length ? <p className="agent__progress">{report.progress}</p> : null}
         {report.next ? (
           <div className="agent__next">
-            <span className="agent__label">下一步</span>
-            <p>{report.next.label}</p>
+            <div className="agent__next-text">
+              <span className="agent__label">下一步</span>
+              <p>{report.next.label}</p>
+            </div>
             <button
               type="button"
               className="btn btn--primary btn--sm"
               onClick={() => void runNextStep()}
               disabled={thinking || busy}
+              title={report.next.tool ? `开始${report.next.label}` : `去${MODULE_LABELS[report.next.target]}`}
             >
-              {report.next.tool ? `开始${report.next.label}` : `去${MODULE_LABELS[report.next.target]}`}
+              {report.next.tool
+                ? NEXT_STEP_ACTION[report.next.tool] ?? '开始'
+                : NEXT_TARGET_ACTION[report.next.target] ?? '去查看'}
             </button>
           </div>
         ) : (
@@ -1057,75 +1058,33 @@ export function AgentPanel({
           ) : null}
         </div>
         <div className="agent__composer">
-          <div className="agent__composer-bar">
-            {/* 上传入口在「客户材料」页（拖拽到页面任意位置同样有效）；这里只保留对话。
-                邮件/聊天记录这类没有文件的内容，用「粘贴为材料」送进来。 */}
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => {
-                setPasting((prev) => !prev);
-                setQuestion('');
-              }}
-            >
-              {pasting ? '取消' : '粘贴为材料'}
-            </button>
-          </div>
-
-          {pasting ? (
-            <textarea
-              className="textarea"
-              rows={4}
-              placeholder="粘贴客户聊天记录或邮件正文…"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-            />
-          ) : (
-            <input
-              className="textarea"
-              value={question}
-              placeholder={
-                module === 'materials'
-                  ? '问材料里的信息，比如「工期是多久」…'
-                  : module === 'requirements'
-                    ? '问客户诉求，或说「整理需求」…'
-                    : '问风险与下一步，比如「支持私有化吗」…'
-              }
-              onChange={(event) => setQuestion(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') send();
-              }}
-            />
-          )}
-
-          <div className="agent__composer-foot">
-            {pasting ? <span className="hint hint--inline">会作为材料存档并抽取要点。</span> : null}
-            {pasting ? (
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={storePasted}
-                disabled={!question.trim()}
-              >
-                存入材料
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={send}
-                disabled={!question.trim()}
-              >
-                发送
-              </button>
-            )}
-          </div>
+          {/* 面板只做对话：材料收件（文件上传 / 文字粘贴）都在「客户材料」页 */}
+          <input
+            className="textarea"
+            value={question}
+            placeholder={
+              module === 'materials'
+                ? '问材料里的信息，比如「工期是多久」…'
+                : module === 'requirements'
+                  ? '问客户诉求，或说「整理需求」…'
+                  : '问风险与下一步，比如「支持私有化吗」…'
+            }
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') send();
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={send}
+            disabled={!question.trim()}
+          >
+            发送
+          </button>
         </div>
       </section>
 
-      <footer className="agent__foot">
-        <p className="hint">AI 初步判断，正式承诺需人工确认。</p>
-      </footer>
     </div>
   );
 

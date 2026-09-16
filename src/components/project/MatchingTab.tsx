@@ -9,10 +9,10 @@ import { IconCheck, IconChevronDown, IconEvidence, IconQuestion, IconTarget } fr
 
 /** 取证轨迹的步骤名 → 人话 */
 const TRACE_STEP_LABEL: Record<string, string> = {
-  recall: '检索',
-  judge: '判断',
-  guardrail: '自检',
-  decide: '降级决策',
+  recall: '查资料',
+  judge: '核对',
+  guardrail: '核查',
+  decide: '结论',
 };
 
 export function MatchingTab({
@@ -210,16 +210,16 @@ export function MatchingTab({
                                       : ''}
                                   </span>
                                   {detail.self_check?.flagged ? (
-                                    <span className="confidence">自检标记，已按上限降级</span>
+                                    <span className="confidence">核查有提示，结论已按更保守的口径给出</span>
                                   ) : null}
                                   {detail.self_check?.reasons?.some((item) => item.code === 'llm_fallback') ? (
-                                    <span className="confidence">本次为规则结果</span>
+                                    <span className="confidence">本次未用 AI，按既定规则给出</span>
                                   ) : null}
                                 </div>
                                 {detail.self_check?.reasons?.length ? (
                                   <div className="detail__flags">
                                     <div className="flag-block flag-block--gap">
-                                      <h5>自检结果</h5>
+                                      <h5>核查提示</h5>
                                       <ul>
                                         {detail.self_check.reasons.map((item) => (
                                           <li key={item.code}>{item.detail}</li>

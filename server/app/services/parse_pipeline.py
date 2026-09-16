@@ -23,14 +23,17 @@ MAX_CHUNK_CHARS = 1400
 
 def guess_material_type(filename: str) -> str:
     name = filename.lower()
-    if any(keyword in name for keyword in ("rfp", "招标", "需求书", "采购", "tender")):
-        return "rfp"
+    # 先判更具体的类型：「XX招标答疑与补充通知」是答疑，不是招标文件本身
     if any(keyword in name for keyword in ("答疑", "澄清", "qa", "question")):
         return "qa"
     if any(keyword in name for keyword in ("纪要", "会议", "minutes", "meeting")):
         return "minutes"
     if any(keyword in name for keyword in ("邮件", "mail", "往来")):
         return "email"
+    if any(keyword in name for keyword in ("聊天", "微信", "im聊天", "chat", "会话")):
+        return "chat"
+    if any(keyword in name for keyword in ("rfp", "招标", "需求书", "采购", "tender")):
+        return "rfp"
     return "other"
 
 

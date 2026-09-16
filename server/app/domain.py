@@ -32,6 +32,7 @@ MATERIAL_TYPES = {
     "minutes": "会议纪要",
     "qa": "答疑纪要",
     "email": "往来邮件",
+    "chat": "聊天记录",
     "other": "其他材料",
 }
 

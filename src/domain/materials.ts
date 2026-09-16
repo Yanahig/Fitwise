@@ -16,13 +16,17 @@ export const MATERIAL_TYPE_LABEL: Record<string, string> = {
   rfp: '招标 / 需求文件',
   minutes: '会议纪要',
   qa: '答疑纪要',
-  email: '往来邮件 / 聊天',
+  email: '往来邮件',
+  chat: '聊天记录',
   other: '其他材料',
 };
 
-/** 粘贴进来的聊天记录文件名里带「聊天」，按往来记录归类 */
+/** 材料类型以上传时的判定为准；类型不明确时再按文件名兜底（老数据、粘贴进来的文字） */
 export function materialType(material: Material): string {
-  if (material.filename.includes('聊天')) return 'email';
+  if (material.material_type && material.material_type !== 'other') return material.material_type;
+  const name = material.filename;
+  if (name.includes('聊天') || name.includes('微信')) return 'chat';
+  if (name.includes('邮件')) return 'email';
   return material.material_type || 'other';
 }
 

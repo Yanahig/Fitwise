@@ -845,6 +845,16 @@
   align-items: start;
 }
 
+/* Agent 面板：默认展开；收起后网格回到单列（否则中间页右边会空出 300px），
+   右下角留一个悬浮按钮再呼出。:has 需要 Chrome/Edge 105+ 或 Safari 15.4+。 */
+.workspace-grid:has(.agent:not(.agent--open)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.agent:not(.agent--open) {
+  display: none;
+}
+
 .cockpit {
   display: flex;
   flex-direction: column;
@@ -1194,14 +1204,18 @@
 /* Agent 输入区：上传、粘贴、提问都从这一个框进 */
 .agent__composer {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: var(--space-2);
 }
 
-.agent__composer-bar {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
+.agent__composer .textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent__composer .btn {
+  flex-shrink: 0;
 }
 
 /* 项目状态卡里的三个功能进度：右侧与中间页唯一的对齐点 */
@@ -1247,6 +1261,34 @@
   font-size: var(--text-md);
   font-weight: 650;
   color: var(--color-foreground);
+}
+
+/* 下一步：一句说明 + 一个短按钮排在同一行，省掉原来三段纵排的松散感 */
+.agent__next {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.agent__next-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.agent__next-text p {
+  color: var(--color-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.agent__next .btn {
+  flex-shrink: 0;
 }
 
 .agent__reasons {
@@ -2305,33 +2347,6 @@ details[open] > summary.case-card__more::before {
 }
 
 /* 判断结果说明：两列紧凑排布，不再一行一个横条 */
-.status-legend {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-3);
-}
-
-/* 一行式图例：不折叠、不占高度，放在结论出现的那一页 */
-.status-legend--inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-5);
-  padding: 0 var(--space-1);
-}
-
-.status-legend__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.status-legend__hint {
-  color: var(--color-muted-foreground);
-  font-size: var(--text-sm);
-}
-
 /* 项目栏内联改名：两个字段 + 保存/取消，不跳页 */
 .rename-row {
   display: flex;
@@ -2354,21 +2369,55 @@ details[open] > summary.case-card__more::before {
   font-weight: 400;
 }
 
-.status-legend__item {
+/* 收件区：虚线框标出"材料从这里进来"，两个显式入口（上传文件 / 输入文字） */
+.material-intake {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
 }
 
-.status-legend__item p {
-  color: var(--color-muted-foreground);
+.material-intake__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  color: var(--color-secondary);
+}
+
+.material-intake__hint strong {
+  display: block;
+  color: var(--color-foreground);
   font-size: var(--text-base);
-  line-height: var(--leading-normal);
+}
+
+.material-intake__hint .hint {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+}
+
+.material-intake__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* 粘贴邮件 / 聊天记录：没有文件的材料也走同一条上传链路；宽度与主模块一致 */
+.paste-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
 }
 
 .case-card__facts dt {
@@ -2571,11 +2620,29 @@ details[open] > summary.case-card__more::before {
 }
 
 .agent__close {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   margin-left: auto;
-  border: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   background: none;
   color: var(--color-tertiary-foreground);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.agent__close:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-foreground);
+}
+
+/* 标题块可收缩，保证右侧「收起」按钮始终留在视野里 */
+.agent__head > div {
+  flex: 1;
+  min-width: 0;
 }
 
 .agent__report {
@@ -2650,6 +2717,29 @@ details[open] > summary.case-card__more::before {
 
 .agent-fab {
   display: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-accent-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-fab:hover {
+  background: var(--color-surface-2);
+}
+
+/* 面板收起时才出现：固定在右下角，不参与网格布局 */
+.workspace-grid:has(.agent:not(.agent--open)) .agent-fab {
+  display: inline-flex;
+  position: fixed;
+  right: var(--space-6);
+  bottom: var(--space-6);
+  z-index: 30;
 }
 
 /* 材料卡：上传的回执。状态从 project.materials 实时读，和材料行说的是同一件事 */
@@ -2666,6 +2756,16 @@ details[open] > summary.case-card__more::before {
 
 .agent-card--wait {
   border-left-color: var(--status-partial-fg);
+}
+
+/* 读完的材料回执收成一行：页数、原文、删除都在「客户材料」页，这里只留"收到并读完"的痕迹 */
+.agent-card--compact {
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.agent-card--compact .agent-card__actions {
+  display: none;
 }
 
 .agent-card--ok {
@@ -2998,12 +3098,6 @@ details[open] > summary.case-card__more::before {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--space-2) var(--space-3);
   align-items: center;
-  cursor: pointer;
-  list-style: none;
-}
-
-.action-group__head::-webkit-details-marker {
-  display: none;
 }
 
 /* 折叠指示：展开时箭头朝上 */
@@ -3078,21 +3172,32 @@ details[open] > summary .group-chevron {
 
 .action-group__list li {
   position: relative;
-  padding-left: var(--space-4);
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  align-items: start;
+  padding-left: 0;
   color: var(--color-secondary);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
 }
 
-.action-group__list li::before {
-  content: '';
-  position: absolute;
-  top: 7px;
-  left: 2px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-accent-border);
+/* 每条行动建议左侧的小标题：一看就知道要确认的是什么类型的事 */
+.action-group__tag {
+  justify-self: start;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-tertiary-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: var(--leading-normal);
+}
+
+.action-group__text {
+  min-width: 0;
 }
 
 .action-group__owner {

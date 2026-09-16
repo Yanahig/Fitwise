@@ -7,7 +7,7 @@ import { useToast } from '../Toast';
 import { useAuth } from '../../state/AuthContext';
 import { HelpTip } from '../HelpTip';
 import { SummaryBar } from './SummaryBar';
-import { IconEvidence } from '../icons';
+import { IconEvidence, IconFile } from '../icons';
 
 function shortDate(value: string): string {
   const date = new Date(value);
@@ -31,6 +31,10 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
   const { meta } = useAuth();
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  /** 邮件、聊天记录这类没有文件的材料：粘进来当材料用 */
+  const [pasting, setPasting] = useState(false);
+  const [pasteKind, setPasteKind] = useState<'email' | 'chat' | 'other'>('email');
+  const [pasteText, setPasteText] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draftValue, setDraftValue] = useState('');
   const [savingFacts, setSavingFacts] = useState(false);
@@ -58,6 +62,64 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
       if (fileInput.current) fileInput.current.value = '';
     }
   };
+
+  const PASTE_KIND_LABEL: Record<'email' | 'chat' | 'other', string> = {
+    email: '邮件往来',
+    chat: '聊天记录',
+    other: '文字材料',
+  };
+
+  /** 粘贴的文字也走同一个上传接口：存成 txt → 本地解析 → 自动整理需求 */
+  const storePasted = async () => {
+    const text = pasteText.trim();
+    if (!text) return;
+    const stamp = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
+    const file = new File([text], `${PASTE_KIND_LABEL[pasteKind]}-${stamp}.txt`, { type: 'text/plain' });
+    setPasting(false);
+    setPasteText('');
+    await uploadFiles([file]);
+  };
+
+  /** 粘贴面板：邮件与聊天记录没有文件，粘正文进来即可当一份材料 */
+  const renderPastePanel = () => (
+    <section className="paste-panel">
+      <label className="field">
+        <span className="field__label">这是一份什么材料</span>
+        <select
+          className="textarea"
+          value={pasteKind}
+          onChange={(event) => setPasteKind(event.target.value as 'email' | 'chat' | 'other')}
+        >
+          <option value="email">邮件往来</option>
+          <option value="chat">聊天记录</option>
+          <option value="other">其他文字材料</option>
+        </select>
+      </label>
+      <label className="field">
+        <span className="field__label">正文</span>
+        <textarea
+          className="textarea"
+          rows={6}
+          placeholder="把邮件正文或聊天记录粘在这里，例如「收件人：… 主题：工期调整 正文：经研究，一期上线时间调整为 3 个月」"
+          value={pasteText}
+          onChange={(event) => setPasteText(event.target.value)}
+        />
+      </label>
+      <div className="intake-inline__actions">
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          disabled={!pasteText.trim() || uploading}
+          onClick={() => void storePasted()}
+        >
+          存入并分析
+        </button>
+        <span className="hint hint--inline">
+          会存成一份材料并自动整理需求；和文件上传走的是同一条链路
+        </span>
+      </div>
+    </section>
+  );
 
   const requirements = project.requirements ?? [];
   const parsed = materials.filter((item) => item.status === 'parsed');
@@ -175,7 +237,7 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
         }
         sub={
           hasMaterials
-            ? `共 ${materials.length} 份 · ${totalPages} 页 · ${requirements.length} 条需求来自这些材料 · 原文由 TextIn 解析`
+            ? `共 ${materials.length} 份 · ${totalPages} 页 · ${requirements.length} 条需求来自这些材料 · 每条都带页码，可点回原文`
             : '材料交给右侧 Agent 上传，读出来的结果会出现在这里'
         }
         lines={[
@@ -237,28 +299,61 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
         }
       />
 
-        {/* 材料清单：只留「是什么、读得怎么样、去哪看原文」 */}
-        {hasMaterials ? (
-          <section className="section-open" id="materials-list">
-            <header className="section-open__head">
-              <div className="section-open__titleline">
-                <h3>
-                  客户材料
-                  <span className="fact-group__count">{materials.length}</span>
-                </h3>
-                <HelpTip text="上传入口在这一页；读出来的结果也在这里，逐条可查看原文。" />
+        {/* 客户材料：收件区在上、已上传清单在下 —— 它们本来就是同一块内容 */}
+        <section className="section-open" id="materials-list">
+          <header className="section-open__head">
+            <div className="section-open__titleline">
+              <h3>
+                客户材料
+                <span className="fact-group__count">{materials.length}</span>
+              </h3>
+              <HelpTip text="文件拖到这里就能上传；读出来的结果也在这一块，逐条可点回原文核对。" />
+            </div>
+          </header>
+
+          {/* 收件区：虚线框是"材料从这里进来"的固定地标，两个显式入口（文件 / 文字） */}
+          <section className="material-intake">
+            <div className="material-intake__hint">
+              <IconFile width={18} height={18} />
+              <div>
+                <strong>把客户材料拖到这里</strong>
+                <span className="hint">
+                  PDF / Word / Excel / PPT / 图片 / OFD / 文本都能读；邮件、聊天记录这类没有文件的，点「材料输入」粘进来
+                </span>
               </div>
-              <div className="section-open__actions">
-                <button
-                  type="button"
-                  className="link-btn"
-                  disabled={uploading}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  {uploading ? '上传中…' : '上传材料'}
-                </button>
-              </div>
-            </header>
+            </div>
+            <div className="material-intake__actions">
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={uploading}
+                onClick={() => fileInput.current?.click()}
+              >
+                {uploading ? '上传中…' : '上传材料'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                onClick={() => setPasting((prev) => !prev)}
+              >
+                {pasting ? '取消输入' : '材料输入'}
+              </button>
+            </div>
+          </section>
+          {llm ? (
+            <p
+              className="hint hint--inline"
+              title={llm.endpoint_host ? `模型服务地址：${llm.endpoint_host}` : undefined}
+            >
+              {llm.external
+                ? '分析会把材料内容发送到外部 AI 服务；企业版可切换为内网部署'
+                : '分析在本内网完成，材料不出内网'}
+            </p>
+          ) : null}
+          {pasting ? renderPastePanel() : null}
+
+          {/* 已上传的材料：只留「是什么、读得怎么样、去哪看原文」 */}
+          {hasMaterials ? (
             <ul className="asset-list material-list">
             {materials.map((item) => (
               <li
@@ -304,41 +399,10 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
               </li>
             ))}
             </ul>
-            {llm ? (
-              <p className="hint hint--inline">
-                {llm.external
-                  ? `分析会把材料内容发送到外部模型服务（${llm.endpoint_host ?? llm.provider}）；企业版可切换为内网模型部署`
-                  : `分析在本内网模型上完成（${llm.endpoint_host ?? llm.provider}）`}
-              </p>
-            ) : null}
-          </section>
-        ) : (
-          <div className="material-empty">
-            <p className="hint">
-              把客户材料拖到页面任意位置，或者点下面的「选择文件」——招标文件、答疑澄清、纪要、Excel 都行，
-              PDF 扫描件也能读。读完后材料与项目要点出现在这里，需求会自动整理到「需求确认」。
-            </p>
-            <div className="intake-inline__actions">
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                disabled={uploading}
-                onClick={() => fileInput.current?.click()}
-              >
-                {uploading ? '上传中…' : '选择文件上传'}
-              </button>
-              <span className="hint hint--inline">支持 PDF / Word / Excel / PPT / 图片 / OFD / 文本</span>
-            </div>
-            {llm ? (
-              <p className="hint hint--inline">
-                {llm.external
-                  ? `分析会把材料内容发送到外部模型服务（${llm.endpoint_host ?? llm.provider}）`
-                  : `分析在本内网模型上完成（${llm.endpoint_host ?? llm.provider}）`}
-                {' · '}企业版可切换为内网模型部署
-              </p>
-            ) : null}
-          </div>
-        )}
+          ) : (
+            <p className="empty-inline">还没有材料。把文件拖到上面的虚线框，或者点「上传材料」。</p>
+          )}
+        </section>
 
       {/* 项目要点：只摘事实，不进确认流程 */}
       {hasMaterials ? (

@@ -979,32 +979,46 @@ async def judge_requirement(
     )
     capped_status, caps = _cap_status_by_guardrail(status, verdict)
     codes = [str(item.get("code")) for item in verdict.get("reasons", [])]
+    # 展示给用户的说法：状态与原因都用中文，模型名/提示词版本/token 这类工程信息留在数据里备查
+    status_text = {"full": "完全支持", "partial": "部分支持", "none": "暂不支持", "unknown": "待补依据"}
+    reason_text = {
+        "source_not_located": "来源没定位到原文",
+        "source_missing": "缺少可回指的来源",
+        "no_support_signal": "没有支持依据",
+        "support_conflict_with_gap": "支持与缺口同时出现",
+        "evidence_reused": "同一处依据被重复引用",
+        "unverified_citation": "理由里的页码不在依据里",
+        "llm_fallback": "这次由系统规则给出",
+    }
     trace = [
         {
             "step": "recall",
-            "detail": f"企业能力 {len(hits)} 份文档、历史案例 {len(case_hits)} 个",
+            "detail": f"查了企业能力资料 {len(hits)} 份、历史案例 {len(case_hits)} 个",
             "rule_cap": rule_status,
         },
         {
             "step": "judge",
-            "detail": (
-                f"模型 {meta.get('model') or '-'}（提示词 {meta.get('prompt_version') or prompts.JUDGE_PROMPT_VERSION}），"
-                f"尝试 {meta.get('attempts') or 0} 次，耗时 {meta.get('latency_ms') or 0} ms，"
-                f"token {int(meta.get('prompt_tokens') or 0) + int(meta.get('completion_tokens') or 0)}"
-            ),
+            "detail": "用这些资料核对了一遍",
             "fallback_used": fallback_used,
             "error_code": meta.get("error_code") or "",
             "trace_id": trace_id,
+            "model": meta.get("model"),
+            "prompt_version": meta.get("prompt_version") or prompts.JUDGE_PROMPT_VERSION,
+            "latency_ms": meta.get("latency_ms"),
+            "tokens": int(meta.get("prompt_tokens") or 0) + int(meta.get("completion_tokens") or 0),
         },
         {
             "step": "guardrail",
-            "detail": "自检通过" if not verdict["flagged"] else "自检标记：" + "、".join(codes),
+            "detail": "核查通过"
+            if not verdict["flagged"]
+            else "核查提示：" + "、".join(reason_text.get(code, code) for code in codes),
             "flagged": verdict["flagged"],
             "codes": codes,
         },
         {
             "step": "decide",
-            "detail": f"结论 {status} → {capped_status}" + ("（" + "；".join(caps) + "）" if caps else ""),
+            "detail": f"结论：{status_text.get(status, status)} → {status_text.get(capped_status, capped_status)}"
+            + ("（" + "；".join(caps) + "）" if caps else ""),
             "caps": caps,
         },
     ]

@@ -87,7 +87,6 @@ export function MatchingModule({ project, matches, refresh, runTask, job, busy }
             能不能做
             <span className="fact-group__count">{matches.length} 条</span>
           </h3>
-          <p>已确认的客户需求 ↔ 现有能力，每条都能点回材料原文与依据</p>
         </div>
       </header>
 

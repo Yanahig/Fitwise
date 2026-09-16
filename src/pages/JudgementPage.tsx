@@ -1,18 +1,9 @@
-import { useState } from 'react';
-import type { MouseEvent } from 'react';
 import type { Match, MatchBasis, Priority, Project } from '../api/types';
-import { EmptyState } from '../components/EmptyState';
-import { useToast } from '../components/Toast';
+import { actionLabel } from '../domain/openQuestions';
 import { BasisList } from '../components/project/BasisList';
 import { SummaryBar } from '../components/project/SummaryBar';
 import type { SummaryLine } from '../components/project/SummaryBar';
-import { MATCH_STATUS_META, STATUS_ORDER } from '../domain/status';
-import {
-  IconCompass,
-  IconRoute,
-  IconTarget,
-  IconUsers,
-} from '../components/icons';
+import { IconRoute, IconTarget, IconUsers } from '../components/icons';
 
 type RiskLevel = 'high' | 'medium' | 'low';
 
@@ -51,26 +42,54 @@ export function JudgementPage({
   busy?: boolean;
   canRun?: boolean;
 }) {
-  const toast = useToast();
-  const [copied, setCopied] = useState<string | null>(null);
-
   if (matches.length === 0) {
+    // 空态和「材料解析 / 需求确认」同一套骨架：保留结论条，内容区用 intake-inline 提示块
+    const parsedCount = project.counts?.materials_parsed ?? project.materials?.length ?? 0;
+    const confirmedCount = project.counts?.requirements_confirmed ?? 0;
+    const missingStep =
+      parsedCount === 0
+        ? { label: '去材料解析', target: 'materials' }
+        : confirmedCount === 0
+          ? { label: '去需求确认', target: 'requirements' }
+          : null;
+    const sub = !parsedCount
+      ? '先在「客户材料」上传材料；读完会自动整理成需求，确认之后我才能逐条判断。'
+      : !confirmedCount
+        ? '需求还没确认。确认之后我才能对着企业内部资料逐条判断能不能做。'
+        : '需求已确认，可以逐条判断能不能做了。';
     return (
-      <EmptyState
-        icon={<IconCompass width={26} height={26} />}
-        title="还没有判断结论"
-        description={
-          canRun
-            ? '需求确认完成后，这里会逐条给出能不能做、风险与下一步。'
-            : '先在右侧 Agent 上传客户材料，再逐条确认需求。'
-        }
-      >
-        {onRerun ? (
-          <button type="button" className="btn btn--primary" disabled={busy || !canRun} onClick={onRerun}>
-            {busy ? '判断中…' : '开始能力判断'}
-          </button>
-        ) : null}
-      </EmptyState>
+      <div className="page page--stack">
+        <SummaryBar tone="info" verdict="还没有判断结论" sub={sub} />
+        <section className="intake-inline">
+          <header className="intake-inline__head">
+            <h3>还没有判断结论</h3>
+            <p className="hint">{sub}</p>
+          </header>
+          <div className="intake-inline__actions">
+            {missingStep ? (
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                onClick={() => {
+                  window.location.hash = `/projects/${project.id}/${missingStep.target}`;
+                }}
+              >
+                {missingStep.label}
+              </button>
+            ) : null}
+            {onRerun ? (
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={busy || !canRun}
+                onClick={onRerun}
+              >
+                {busy ? '判断中…' : '开始能力判断'}
+              </button>
+            ) : null}
+          </div>
+        </section>
+      </div>
     );
   }
 
@@ -151,37 +170,6 @@ export function JudgementPage({
     // 赢单可能性不再作为结论输出：这个字段没有 AI 来源，只有人工/种子值
   ].filter(Boolean);
 
-  const copyList = async (key: string, title: string, lines: string[]) => {
-    if (!lines.length) {
-      toast.push('暂时没有可复制的内容', 'error');
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(
-        [`【${project.customer_name} · ${project.name}】${title}`, '', ...lines.map((item, i) => `${i + 1}. ${item}`)].join(
-          '\n',
-        ),
-      );
-      setCopied(key);
-      toast.push('已复制', 'success');
-      window.setTimeout(() => setCopied(null), 2000);
-    } catch {
-      toast.push('浏览器未允许剪贴板访问', 'error');
-    }
-  };
-
-  /** 折叠卡片标题里的按钮：先拦掉「点击会收起卡片」的默认行为，再复制 */
-  const copyFromSummary = (
-    event: MouseEvent<HTMLButtonElement>,
-    key: string,
-    title: string,
-    lines: string[],
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-    void copyList(key, title, lines);
-  };
-
   const priorityLabel: Record<Priority, string> = { high: '优先', medium: '常规', low: '可选' };
 
   /** 结论条上的三句概括：各自指向下面那一块，点一下就跳过去 —— 它同时是这一页的目录 */
@@ -239,20 +227,6 @@ export function JudgementPage({
         <div id="judgement-detail">{detail}</div>
       ) : null}
 
-      {/* 四种结论的含义：放在结论出现的这一页，一行铺开不折叠 */}
-      <section className="status-legend status-legend--inline" aria-label="判断结果说明">
-        {STATUS_ORDER.map((status) => (
-          <span key={status} className="status-legend__chip">
-            <span className={`status-badge status-badge--${MATCH_STATUS_META[status].tone}`}>
-              {MATCH_STATUS_META[status].label}
-            </span>
-            <span className="status-legend__hint" title={MATCH_STATUS_META[status].description}>
-              {MATCH_STATUS_META[status].description}
-            </span>
-          </span>
-        ))}
-      </section>
-
       {/* 一类：行动建议 —— 按对象分三类。风险没有独立板块：挂在哪条需求上就展开在「能不能做」里 */}
       <section className="section-open" id="judgement-actions">
         <header className="section-open__head">
@@ -264,134 +238,95 @@ export function JudgementPage({
                 {toCustomer.length + toInternal.length + toSales.length}
               </span>
             </h3>
-            <p>和需求确认页是同一个问题池，这里按问谁分组；每组能整段复制</p>
           </div>
         </header>
 
         <div className="action-groups">
-          <details className="action-group" open>
-            <summary className="action-group__head">
+          <section className="action-group">
+            <div className="action-group__head">
               <span className="action-group__icon">
                 <IconUsers width={15} height={15} />
               </span>
               <h4>要问客户</h4>
               <span className="action-group__tail">
                 <span className="action-group__count">{toCustomer.length}</span>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={(event) =>
-                    copyFromSummary(event, 'customer', '要问客户的问题', toCustomer)
-                  }
-                >
-                  {copied === 'customer' ? '已复制' : '复制'}
-                </button>
-                <span className="group-chevron" aria-hidden="true" />
               </span>
-            </summary>
+            </div>
             <ul className="action-group__list">
-              {toCustomer.slice(0, 3).map((item) => (
-                <li key={item}>{item}</li>
+              {/* 每条左侧带小标题：一眼看出要确认的是哪一类事 */}
+              {toCustomer.map((item) => (
+                <li key={item}>
+                  <span className="action-group__tag">{actionLabel(item)}</span>
+                  <span className="action-group__text">{item}</span>
+                </li>
               ))}
-              {toCustomer.length > 4 ? (
-                  <li className="action-group__rest">还有 {toCustomer.length - 3} 条，复制后可看全部</li>
-              ) : null}
               {toCustomer.length === 0 ? <li className="action-group__rest">暂无</li> : null}
             </ul>
-          </details>
+          </section>
 
-          <details className="action-group">
-            <summary className="action-group__head">
+          <section className="action-group">
+            <div className="action-group__head">
               <span className="action-group__icon">
                 <IconTarget width={15} height={15} />
               </span>
               <h4>要问内部</h4>
               <span className="action-group__tail">
                 <span className="action-group__count">{toInternal.length}</span>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={(event) =>
-                    copyFromSummary(
-                      event,
-                      'internal',
-                      '要问内部的问题',
-                      toInternal.map((item) =>
-                        item.owner ? `${item.question}（${item.owner}）` : item.question,
-                      ),
-                    )
-                  }
-                >
-                  {copied === 'internal' ? '已复制' : '复制'}
-                </button>
-                <span className="group-chevron" aria-hidden="true" />
               </span>
-            </summary>
+            </div>
             <ul className="action-group__list">
-              {toInternal.slice(0, 3).map((item) => (
+              {toInternal.map((item) => (
                 <li key={item.question}>
-                  {item.question}
-                  {item.owner ? <em className="action-group__owner">{item.owner}</em> : null}
+                  <span className="action-group__tag">{actionLabel(item.question)}</span>
+                  <span className="action-group__text">
+                    {item.question}
+                    {item.owner ? <em className="action-group__owner">{item.owner}</em> : null}
+                  </span>
                 </li>
               ))}
-              {toInternal.length > 4 ? (
-                <li className="action-group__rest">还有 {toInternal.length - 3} 条</li>
-              ) : null}
               {toInternal.length === 0 ? <li className="action-group__rest">暂无</li> : null}
             </ul>
-          </details>
+          </section>
 
-          <details className="action-group">
-            <summary className="action-group__head">
+          <section className="action-group">
+            <div className="action-group__head">
               <span className="action-group__icon">
                 <IconRoute width={15} height={15} />
               </span>
               <h4>要同步销售</h4>
               <span className="action-group__tail">
                 <span className="action-group__count">{toSales.length}</span>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={(event) =>
-                    copyFromSummary(event, 'sales', '要同步给销售的动作与边界', [
-                      ...toSales.map(
-                        (item) => `${item.action}（${item.owner}${item.due ? ` · ${item.due}` : ''}）`,
-                      ),
-                      ...boundaries.map((item) => `承诺边界：${item}`),
-                    ])
-                  }
-                >
-                  {copied === 'sales' ? '已复制' : '复制'}
-                </button>
-                <span className="group-chevron" aria-hidden="true" />
               </span>
-            </summary>
+            </div>
             <ul className="action-group__list">
-              {toSales.slice(0, 3).map((item) => (
+              {toSales.map((item) => (
                 <li key={item.action}>
-                  {item.action}
-                  <em className="action-group__owner">
-                    {item.owner}
-                    {item.due ? ` · ${item.due}` : ''}
-                    {item.priority ? ` · ${priorityLabel[item.priority]}` : ''}
-                  </em>
-                  <BasisList basis={item.basis} materials={project.materials ?? []} />
+                  <span className="action-group__tag">{actionLabel(item.action)}</span>
+                  <span className="action-group__text">
+                    {item.action}
+                    <em className="action-group__owner">
+                      {item.owner}
+                      {item.due ? ` · ${item.due}` : ''}
+                      {item.priority ? ` · ${priorityLabel[item.priority]}` : ''}
+                    </em>
+                    <BasisList basis={item.basis} materials={project.materials ?? []} />
+                  </span>
                 </li>
               ))}
-              {toSales.length > 4 ? (
-                <li className="action-group__rest">还有 {toSales.length - 3} 条</li>
-              ) : null}
               {toSales.length === 0 ? <li className="action-group__rest">暂无</li> : null}
             </ul>
-            <div className="action-group__promise">
-              <span className="action-group__promise-title">承诺边界</span>
-              <ul>
-                {boundaries.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </details>
+            {/* 没有承诺边界就不占位：能力缺口与待补依据都没有时，这一块没有可说的内容 */}
+            {boundaries.length ? (
+              <div className="action-group__promise">
+                <span className="action-group__promise-title">承诺边界</span>
+                <ul>
+                  {boundaries.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
         </div>
       </section>
     </div>

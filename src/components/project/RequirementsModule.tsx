@@ -46,6 +46,8 @@ export function RequirementsModule({
   const materials = project.materials ?? [];
   const parsedMaterials = materials.filter((item) => item.status === 'parsed');
   const questions = project.open_questions ?? [];
+  /** 需求页只展示「会影响结论」的问题；只影响承诺口径的归售前建议页的行动建议 */
+  const judgementQuestions = questions.filter((item) => summarizeOpenQuestion(item).affectsJudgement);
   /** 待澄清的问题分两种：问客户的、内部先确认的 —— 概括行里要分得清 */
   const customerQuestions = questions.filter((item) => (item.owner || '客户') !== '内部').length;
   const internalQuestions = questions.length - customerQuestions;
@@ -279,15 +281,13 @@ export function RequirementsModule({
           },
           {
             label: '草稿需求',
-            text: inferred.length ? `${inferred.length} 条，确认后进基线` : '全部已进基线',
+            text: inferred.length ? `${inferred.length} 条，确认后才算数` : '全部已确认',
             target: inferred.length ? 'requirements-draft' : 'requirements-list',
           },
           {
             label: '待澄清',
             text: questions.length
-              ? `${questions.length} 处（问客户 ${customerQuestions} · 内部 ${internalQuestions}${
-                  impactCount ? `，${impactCount} 处影响判断` : ''
-                }）`
+              ? `${impactCount} 处影响判断（共 ${questions.length} 处待澄清：问客户 ${customerQuestions} · 内部 ${internalQuestions}）`
               : '暂时没有待澄清问题',
             target: 'pending-questions',
           },
@@ -336,7 +336,7 @@ export function RequirementsModule({
                 需求
                 <span className="fact-group__count">{requirements.length}</span>
               </h3>
-              <HelpTip text="客户材料里读出来的要求都在这一份清单里。带「草稿」标记的还没进基线，点确认后才算数 —— 只有进了基线的才会拿去判断能不能做。" />
+              <HelpTip text="客户材料里读出来的要求都在这一份清单里。带「草稿」标记的还没确认，点确认后才算数 —— 只有确认过的才会拿去判断能不能做。" />
             </div>
             <div className="section-open__actions">
               <button
@@ -442,16 +442,16 @@ export function RequirementsModule({
           <div className="section-open__titleline">
             <h3>
               待澄清问题
-              <span className="fact-group__count">{questions.length}</span>
+              <span className="fact-group__count">{judgementQuestions.length}</span>
             </h3>
-            <HelpTip text="材料没写清的点都放在这里。标「影响判断」的会直接改变能力结论，其余只影响承诺口径。前面的标签是「问谁」：客户就是问客户，内部就是自己人先确认。" />
+            <HelpTip text="只列会影响「能不能做」的问题 —— 这些不确认，能力结论就不成立。验收、合规、定制边界这类只影响承诺口径的确认项，统一放在售前建议页的「行动建议」里。" />
           </div>
         </header>
-        {questions.length === 0 ? (
-          <p className="empty-inline">暂时没有需要澄清的问题。</p>
+        {judgementQuestions.length === 0 ? (
+          <p className="empty-inline">没有会影响结论的待澄清问题。</p>
         ) : (
           <ul className="gap-lines">
-            {questions.map((item) => {
+            {judgementQuestions.map((item) => {
               const insight = summarizeOpenQuestion(item);
               return (
                 <li key={item.question}>

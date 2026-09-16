@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import agent, analysis, auth, customers, dashboard, knowledge, materials, projects
+from .routers import agent, analysis, auth, customers, dashboard, knowledge, materials, projects, traces
 from .seed import seed_all
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -52,6 +52,7 @@ app.include_router(agent.router)
 app.include_router(analysis.router)
 app.include_router(dashboard.router)
 app.include_router(knowledge.router)
+app.include_router(traces.router)
 
 
 @app.get("/api/health-check")

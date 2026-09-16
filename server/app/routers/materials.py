@@ -20,8 +20,12 @@ router = APIRouter(tags=["materials"])
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # TextIn 单文件上限 500MB
 
 
-def _parse_in_background(material_id: int) -> None:
-    """后台解析：独立 session，避免请求结束后连接已关闭。"""
+def _parse_in_background(material_id: int, trace_id: str = "") -> None:
+    """后台解析：独立 session，避免请求结束后连接已关闭。
+
+    trace_id 由上传请求生成，解析与随后的自动整理需求共用同一个 id，
+    这样一次上传在 AI 调用账本里就是一次可复盘的运行（见 services/ai_ledger.py）。
+    """
     db = SessionLocal()
     try:
         material = db.get(Material, material_id)
@@ -29,7 +33,7 @@ def _parse_in_background(material_id: int) -> None:
             return
         import asyncio
 
-        asyncio.run(parse_material(db, material))
+        asyncio.run(parse_material(db, material, trace_id=trace_id))
         project = db.get(Project, material.project_id)
         log_activity(
             db,
@@ -55,7 +59,13 @@ def _parse_in_background(material_id: int) -> None:
                 .all()
             )
             created, blocked = asyncio.run(
-                agents.analyze_requirements(db, project=project, materials=materials, actor="Fitwise Agent")
+                agents.analyze_requirements(
+                    db,
+                    project=project,
+                    materials=materials,
+                    actor="Fitwise Agent",
+                    trace_id=trace_id,
+                )
             )
             log_activity(
                 db,
@@ -129,7 +139,8 @@ async def upload_material(
     )
     db.commit()
 
-    background.add_task(_parse_in_background, material.id)
+    # 上传即开一次运行：解析 → 自动整理需求都挂在这个 trace_id 下
+    background.add_task(_parse_in_background, material.id, uuid.uuid4().hex[:12])
     return material_out(material)
 
 
@@ -146,7 +157,7 @@ def reparse_material(
     material.status = "uploaded"
     material.parse_error = ""
     db.commit()
-    background.add_task(_parse_in_background, material.id)
+    background.add_task(_parse_in_background, material.id, uuid.uuid4().hex[:12])
     return material_out(material)
 
 

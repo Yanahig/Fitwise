@@ -45,7 +45,30 @@ def wait_ready(timeout: int = 60) -> bool:
     return False
 
 
+def port_in_use() -> bool:
+    """端口上已经有别的实例在跑吗？
+
+    之前踩过的坑：别人（或上一次没退干净的沙箱）已经占着这个端口时，
+    `wait_ready` 会连上**那个**实例、然后一路返回 True —— 于是这次回归其实跑在
+    另一份代码、另一个库上，"PASS"是假阳性。所以先做一次端口预检，冲突就直接退出。
+    """
+    try:
+        httpx.get(f"{BASE}/api/health-check", timeout=2)
+        return True
+    except Exception:  # noqa: BLE001 - 连不上说明端口是空的
+        return False
+
+
 def main() -> int:
+    if port_in_use():
+        print(
+            f"RESULT: FAIL - 端口 {PORT} 上已经有实例在跑。\n"
+            f"  回归必须跑在自己的沙箱里，否则会误判别人的实例。\n"
+            f"  换个端口：$env:FITWISE_SANDBOX_PORT=\"8021\"; "
+            f".venv\\Scripts\\python.exe scripts\\regression_check.py --with-agent"
+        )
+        return 1
+
     workdir = Path(tempfile.mkdtemp(prefix="fitwise-regression-"))
     source_db = SERVER_DIR / "data" / "fitwise.db"
     if source_db.exists():
@@ -56,16 +79,27 @@ def main() -> int:
     env["STORAGE_DIR"] = str(workdir / "uploads")
 
     print(f"sandbox: {workdir}  →  {BASE}")
+    # 沙箱后端的日志留一份：起不来时能直接看到原因（以前丢进 DEVNULL，出问题只能猜）
+    server_log = (workdir / "sandbox-server.log").open("w", encoding="utf-8")
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(PORT)],
         cwd=str(SERVER_DIR),
         env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=server_log,
+        stderr=subprocess.STDOUT,
     )
     try:
         if not wait_ready():
             print("RESULT: FAIL - 沙箱后端没起来")
+            print(f"  端口 {PORT} 上没等到 /api/health-check，sanity 日志（最后 15 行）：")
+            server_log.flush()
+            tail = (workdir / "sandbox-server.log").read_text(encoding="utf-8", errors="replace").splitlines()
+            for line in tail[-15:]:
+                print("   " + line)
+            if server.poll() is not None:
+                print(f"  进程已退出，退出码 {server.returncode}")
+            else:
+                print("  进程还在跑 —— 大概率是端口被占（上一次沙箱没退干净），重跑一次即可")
             return 1
         print("sandbox: ready\n")
 
@@ -92,6 +126,16 @@ def main() -> int:
             if agent_check.returncode != 0:
                 print("\nRESULT: FAIL - 对话检查")
                 return agent_check.returncode
+
+            print("\n--- AI 调用账本（成本与可观测） ---")
+            trace_check = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "check_trace_api.py")],
+                env=smoke_env,
+                cwd=str(ROOT),
+            )
+            if trace_check.returncode != 0:
+                print("\nRESULT: FAIL - 调用账本")
+                return trace_check.returncode
         return 0
     finally:
         server.terminate()

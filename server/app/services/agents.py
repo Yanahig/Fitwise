@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from .. import prompts
 from ..domain import infer_tags, is_pending_name
 from ..models import (
     CapabilityDoc,
@@ -30,7 +31,7 @@ from ..models import (
     Requirement,
     Solution,
 )
-from . import retrieval
+from . import ai_ledger, retrieval
 from .llm import chat_json
 
 logger = logging.getLogger(__name__)
@@ -54,63 +55,18 @@ REQUIREMENT_KEYWORDS = (
     "合规",
 )
 
-REQUIREMENT_SCHEMA = """{
-  "customer_name": "从材料里识别出的客户单位名称；材料里没写就留空字符串",
-  "project_name": "从材料里识别出的项目名称；材料里没写就留空字符串",
-  "requirements": [{
-    "title": "需求短标题（不超过 18 字）",
-    "detail": "需求描述，保留客户口径",
-    "category": "部署|产品能力|技术|合规|规模|服务",
-    "priority": "high|medium|low",
-    "tags": ["能力标签，从需求中推断"],
-    "constraints": ["客户提出的硬性约束"],
-    "source_material_name": "来源文件名（必须与输入材料名一致）",
-    "source_page": 1,
-    "source_heading": "来源章节",
-    "source_excerpt": "来源原文片段（不超过 80 字）"
-  }],
-  "open_questions": [{
-    "question": "待澄清问题",
-    "why": "为什么要问",
-    "owner": "客户|内部"
-  }],
-  "project_facts": [{
-    "label": "客户与项目|建设范围|工期口径|预算|交付环境|关键时间点|决策链",
-    "value": "从材料里摘出的客观事实，不加判断、不写建议",
-    "source_material_name": "来源文件名（必须与输入材料名一致）",
-    "source_page": 1,
-    "source_excerpt": "来源原文片段（不超过 60 字）"
-  }],
-  "material_summaries": [{
-    "material_name": "来源文件名（必须与输入材料名一致）",
-    "summary": "这份材料整体写了什么，一句话、不超过 60 字，只讲事实"
-  }]
-}"""
-
-JUDGE_SCHEMA = """{
-  "status": "full|partial|none|unknown",
-  "headline": "一句话结论（不超过 40 字）",
-  "condition": "非完全支持时的一句话前置条件或缺口",
-  "rationale": "为什么这样判断，必须引用客户来源与企业证据（含页码）",
-  "gaps": ["能力缺口或前置条件"],
-  "confirmations": ["需要继续确认的问题"],
-  "confidence": 0.0
-}"""
-
-SOLUTION_SCHEMA = """{
-  "summary": "整体判断（2-3 句）",
-  "steps": [{ "title": "", "detail": "", "based_on": ["依据的产品或案例"], "status": "full|partial|none|unknown" }],
-  "capability_plan": [{ "product": "", "role": "", "readiness": "full|partial|none|unknown" }],
-  "ask_customer": ["需要向客户确认的问题"],
-  "ask_internal": [{ "question": "需要内部确认的问题", "owner": "平台研发|产品团队|交付团队|售前负责人" }],
-  "risks": [{ "level": "high|medium|low", "title": "", "detail": "", "mitigation": "", "based_on": [1, 3] }],
-  "next_actions": [{ "action": "", "owner": "", "due": "", "priority": "high|medium|low", "based_on": [1] }]
-}"""
-
-
 # --------------------------------------------------------------------------- #
 # 工具函数
 # --------------------------------------------------------------------------- #
+
+
+def _ledger_recorder(db: Session, *, project_id: int):
+    """把模型调用记进 AI 调用账本。写账本失败不影响业务（见 services/ai_ledger.py）。"""
+
+    def record(entry: dict[str, Any]) -> None:
+        ai_ledger.record(db, project_id=project_id, **entry)
+
+    return record
 
 
 def _clip(text: str, limit: int) -> str:
@@ -398,6 +354,7 @@ async def analyze_requirements(
     project: Project,
     materials: list[Material],
     actor: str,
+    trace_id: str = "",
 ) -> tuple[list[Requirement], dict[str, Any]]:
     """抽出草稿需求，并回传"被拦掉多少"：去重几条、因为没有来源丢掉几条。
 
@@ -409,45 +366,21 @@ async def analyze_requirements(
         raise ValueError("没有已解析完成的材料，无法抽取需求")
 
     digest, truncated = _material_digest(db, parsed)
-    system = (
-        "你是企业售前的需求分析助手。请从客户材料中抽取核心需求、需求分类、优先级、硬性约束与待确认问题。"
-        "每条需求必须给出真实来源（文件名 + 页码）；材料中没有明确的信息要放入 open_questions，不要编造。"
-        "表达用售前听得懂的口语化中文，不要使用技术或工程术语（例如「基线」「落库」「模型」「检索」）。"
-    )
-    user = "\n".join(
-        [
-            f"【项目】{project.name}",
-            f"【客户材料如下，格式为 (P页码·章节) 原文】",
-            digest,
-            "【抽取要求】",
-            "1. 只抽取客户明确提出的需求，同一件事只输出一条：即使材料里分处不同段落/不同页码去描述"
-            "同一个要求（例如接口与并发写在两处），也要合并成一条，不要拆成两条近义需求；",
-            "2. category 只能是 部署/产品能力/技术/合规/规模/服务 之一；",
-            "3. source_material_name 必须与上面的材料名完全一致，source_page 必须是该材料中出现的页码；",
-        "4. 材料中未明确、但会影响判断的信息，写入 open_questions。",
-        "4.1 另外识别两样东西：customer_name（客户单位名称，例如「XX市档案馆」）与 project_name"
-        "（项目名称，20 字以内，去掉客户单位名与「招标需求书 / RFP / 建设项目」这类字样，"
-        "例如「档案数字化与智能处理平台」）。只从材料的标题、抬头、落款里认，"
-        "认不出就留空字符串，不要自己编一个名字。",
-        "5. 另外摘出 3-8 条 project_facts，label 只能从这七个里选：客户与项目 / 建设范围 / 工期口径 / "
-            "预算 / 交付环境 / 关键时间点 / 决策链；不要自创分类。",
-            "6. project_facts 只写材料里明确写着的客观事实，不写判断、不写建议；「关键时间点」只写日期与里程碑"
-            "（答疑截止、投标截止、上线时间），接口与性能要求不要放进来；每条必须给出 source_material_name、"
-            "source_page 与 source_excerpt；同一件事在不同材料里口径不一致时按原文各记一条"
-            "（例如「工期口径：RFP 要求 4 个月」与「工期口径：07-22 邮件改为 3 个月」）。",
-            "7. material_summaries 要为每一份材料写一句：这份材料整体写了什么（不超过 60 字），"
-            "只讲事实、不写判断，material_name 必须与材料名完全一致 —— 它会显示在材料清单里，供人一眼知道这堆材料是什么。",
-        ]
-    )
+    system = prompts.EXTRACT_SYSTEM
+    user = prompts.extract_user_prompt(project_name=project.name, digest=digest)
 
     meta: dict[str, Any] = {}
     payload = await chat_json(
         system=system,
         user=user,
-        schema_hint=REQUIREMENT_SCHEMA,
+        schema_hint=prompts.REQUIREMENT_SCHEMA,
         fallback=lambda: _fallback_requirements(parsed, digest),
         required_keys=["requirements"],
         meta=meta,
+        trace_id=trace_id,
+        step="extract",
+        prompt_version=prompts.EXTRACT_PROMPT_VERSION,
+        on_call=_ledger_recorder(db, project_id=project.id),
     )
 
     fallback_used = bool(meta.get("fallback_used"))
@@ -653,6 +586,7 @@ async def analyze_requirements(
         "concurrent_duplicates_removed": concurrent_duplicates,
         "digest_truncated": int(bool(truncated)),
         "llm_fallback": int(fallback_used),
+        "prompt_version": prompts.EXTRACT_PROMPT_VERSION,
         "identified_customer": identified_customer,
         "identified_project": identified_project,
     }
@@ -960,6 +894,7 @@ async def judge_requirement(
     db: Session,
     *,
     requirement: Requirement,
+    trace_id: str = "",
 ) -> MatchResult:
     text = f"{requirement.title} {requirement.detail}"
     tags = list(dict.fromkeys((requirement.tags or []) + infer_tags(text)))
@@ -991,30 +926,15 @@ async def judge_requirement(
         or "（未检索到相似历史案例）"
     )
 
-    system = (
-        "你是企业售前决策助手，负责判断客户需求能否被企业现有能力满足。"
-        "必须做判断而不是总结；结论只能引用下面给出的证据；证据中没有的能力不得推断为支持；"
-        "不输出最终承诺，只输出售前初步判断。"
-        "表达用售前听得懂的口语化中文，不要使用技术或工程术语（例如「基线」「落库」「模型」「检索」「置信度」）。"
-    )
-    user = "\n".join(
-        [
-            f"【客户需求】{requirement.title}",
-            f"需求描述：{requirement.detail}",
-            f"客户来源：{requirement.source_material_name} P{requirement.source_page or '-'} —— {requirement.source_excerpt}",
-            "",
-            "【企业能力证据】",
-            evidence_block,
-            "",
-            "【历史成功案例】",
-            case_block,
-            "",
-            "【判断要求】",
-            "1. status 只能是 full（完全支持）/ partial（部分支持）/ none（暂不支持）/ unknown（信息不足需要确认）；",
-            "2. 结论必须能回溯到上面的文档名与页码；",
-            "3. 缺少证据时输出 unknown，并说明需要确认什么；",
-            "4. headline 用一句话说明企业能力现状，condition 写明前置条件或缺口。",
-        ]
+    system = prompts.JUDGE_SYSTEM
+    user = prompts.judge_user_prompt(
+        title=requirement.title,
+        detail=requirement.detail,
+        source_material_name=requirement.source_material_name,
+        source_page=requirement.source_page,
+        source_excerpt=requirement.source_excerpt,
+        evidence_block=evidence_block,
+        case_block=case_block,
     )
 
     fallback = lambda: _fallback_judgement(requirement, hits, case_hits)  # noqa: E731
@@ -1022,10 +942,14 @@ async def judge_requirement(
     payload = await chat_json(
         system=system,
         user=user,
-        schema_hint=JUDGE_SCHEMA,
+        schema_hint=prompts.JUDGE_SCHEMA,
         fallback=fallback,
         required_keys=["status", "rationale"],
         meta=meta,
+        trace_id=trace_id,
+        step="judge",
+        prompt_version=prompts.JUDGE_PROMPT_VERSION,
+        on_call=_ledger_recorder(db, project_id=requirement.project_id),
     )
 
     rule_status = _rule_status(hits)
@@ -1064,10 +988,13 @@ async def judge_requirement(
         {
             "step": "judge",
             "detail": (
-                f"模型 {meta.get('model') or '-'}，尝试 {meta.get('attempts') or 0} 次，"
-                f"耗时 {meta.get('latency_ms') or 0} ms"
+                f"模型 {meta.get('model') or '-'}（提示词 {meta.get('prompt_version') or prompts.JUDGE_PROMPT_VERSION}），"
+                f"尝试 {meta.get('attempts') or 0} 次，耗时 {meta.get('latency_ms') or 0} ms，"
+                f"token {int(meta.get('prompt_tokens') or 0) + int(meta.get('completion_tokens') or 0)}"
             ),
             "fallback_used": fallback_used,
+            "error_code": meta.get("error_code") or "",
+            "trace_id": trace_id,
         },
         {
             "step": "guardrail",
@@ -1400,6 +1327,7 @@ async def compose_solution(
     matches: list[MatchResult],
     problem: str,
     actor: str,
+    trace_id: str = "",
 ) -> Solution:
     # 带编号：模型在 based_on 里回编号，后端按编号校验成需求 id（比标题可靠）
     match_lines = "\n".join(
@@ -1407,35 +1335,24 @@ async def compose_solution(
         f"｜缺口：{(match.gaps or ['无'])[0]}｜待确认：{(match.confirmations or ['无'])[0]}"
         for index, match in enumerate(matches, start=1)
     )
-    system = (
-        "你是企业售前的方案助手。请基于已完成的「需求 × 企业能力匹配结果」给出解决路径与下一步行动。"
-        "不得承诺知识库中没有的能力；风险与待确认项必须明确列出；输出面向售前的可执行建议。"
-        "表达用售前听得懂的口语化中文，不要使用技术或工程术语（例如「基线」「落库」「模型」「检索」）。"
-    )
-    user = "\n".join(
-        [
-            f"【项目】{project.name}",
-            f"【客户问题】{problem}",
-            "【匹配结果】",
-            match_lines or "（尚未完成能力匹配）",
-            "",
-            "【要求】",
-            "1. 解决路径按“可直接使用的能力 → 需确认的前置条件 → 需要补信息或定制的部分”排序；",
-            "2. ask_customer 是问客户的问题，ask_internal 是要内部拉通的问题（含责任方）；",
-            "3. 风险分为 high / medium / low，每条都要有应对建议；",
-            "4. next_actions 要具体、可指派、带时限；",
-            "5. risks 与 next_actions 每条都必须写 based_on：填上面匹配结果里的**需求编号**（整数数组，"
-            "例如 [1, 3]），编号必须来自上面的列表，至少一个 —— 售前会顺着它去核对依据。",
-        ]
+    system = prompts.SOLUTION_SYSTEM
+    user = prompts.solution_user_prompt(
+        project_name=project.name,
+        problem=problem,
+        match_lines=match_lines,
     )
     meta: dict[str, Any] = {}
     payload = await chat_json(
         system=system,
         user=user,
-        schema_hint=SOLUTION_SCHEMA,
+        schema_hint=prompts.SOLUTION_SCHEMA,
         fallback=lambda: _fallback_solution(project, matches, problem),
         required_keys=["summary"],
         meta=meta,
+        trace_id=trace_id,
+        step="solution",
+        prompt_version=prompts.SOLUTION_PROMPT_VERSION,
+        on_call=_ledger_recorder(db, project_id=project.id),
     )
 
     previous = (

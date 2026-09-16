@@ -101,8 +101,19 @@ guardrail 只标记不拦截，这与产品哲学同构：AI 只准备，人做�
   （重试一次 → 规则回退），而不是用默认值把问题吃掉。
 - **模型选择**：按任务复杂度分流——抽取/判断用强模型，对话路由与换词用便宜模型；
   换词策略优先走规则同义词表（零成本），模型只做兜底。
-- **版本可追溯**：轨迹里记录模型名、耗时、尝试次数、是否回退；结论可回答
-  "用哪版模型、哪版提示词、哪版知识库算出来的"。
+- **提示词集中且有版本号**：四个步骤的指令与 schema 都在 `app/prompts.py`，
+  每步一个版本号（`extract@2026-09-16.1` 这种），改提示词就递增；`PROMPT_SET_VERSION`
+  是整体版本，方便按批次回归对比。
+- **版本可追溯**：轨迹里记录模型名、耗时、尝试次数、是否回退，并带上提示词版本与
+  trace_id；结论可回答"用哪版模型、哪版提示词算出来的、属于哪一次运行"。
+- **失败成因与重试策略**：每次失败都归类（`timeout` / `network` / `rate_limit` /
+  `server_error` / `auth` / `bad_json` / `missing_keys` …）。网络与限流类重试一次，
+  输出不合规也重试一次（模型输出有随机性），凭据错与请求不合法直接走回退 ——
+  不把一轮等待浪费在注定失败的请求上。解析侧（TextIn）与模型侧同一套判定。
+- **调用账本**：`ai_calls` 表记录每次调用的 trace_id / step / provider / model /
+  prompt_version / attempts / latency / tokens / fallback / 失败码。一次用户动作
+  （一次上传、一次"从头跑一遍"、一次提问）就是一个 trace_id，解析 → 抽取 → 每条判断 →
+  建议都能按同一个 id 复盘。写账本走 savepoint 隔离，写不进去只记日志，不影响业务。
 
 ## 6. 能力核对（建之前先对一遍）
 
@@ -119,7 +130,7 @@ guardrail 只标记不拦截，这与产品哲学同构：AI 只准备，人做�
 
 ## 7. 变更清单与影响面
 
-### 本轮已实现
+### 已实现（Agent 内核那一轮）
 
 - `models.py` / `db.py`：`MatchResult` 新增 `trace`、`self_check` 两列（轻量迁移自动补列）。
 - `services/llm.py`：`chat_json` 支持 `required_keys` 校验与 `meta` 回传（模型、耗时、尝试次数、是否回退）。
@@ -141,13 +152,40 @@ guardrail 只标记不拦截，这与产品哲学同构：AI 只准备，人做�
 - `scripts/check_agent_conversation.py`：审批链检查先自铺前置条件（确保有待确认需求），
   不再依赖上一个脚本留下的状态。
 
+### 已实现（工程化加固那一轮：版本、账本、重试）
+
+这一轮不加产品能力，只补"能不能回滚、能不能算账、挂了知不知道为什么"：
+
+- `app/prompts.py`（新）：四个步骤的 system 提示词、schema 与 user 模板集中一处，
+  带 `PROMPT_SET_VERSION` 与每步版本号；`agents.py` / `agent_router.py` 不再内联提示词。
+- `models.py`：新增 `AiCall`（`ai_calls` 表）。`init_db()` 的 `create_all` 会自动建表，
+  已有演示库不需要重建。
+- `services/ai_ledger.py`（新）：账本写入（savepoint 隔离，失败不影响业务）、
+  按 trace 复盘、按项目汇总（次数 / token / 失败 / 回退 / 平均耗时 / 按步骤分组）、
+  失败成因码与"可不可重试"的判定。
+- `services/llm.py`：`chat_json` 结算 token（`usage`）、归类失败成因、
+  把 trace_id / step / prompt_version / on_call 交给账本；不再对注定失败的请求做第二次尝试。
+- `services/textin.py`：可重试失败（网络 / 超时 / 限流 / 5xx）自动重试一次，
+  不可重试（凭据错、文件内容问题）立即失败；失败成因码回传上层。
+- `services/parse_pipeline.py`：解析步骤也进账本，`material.parse_error` 带成因码前缀
+  （`[timeout] …` / `[auth] …`），界面可以据此给不同的下一步提示。
+- `routers/traces.py`（新）：`GET /api/projects/{id}/ai-calls`（成本口径）、
+  `GET /api/traces/{trace_id}`（复盘口径）。
+- `routers/analysis.py` / `routers/materials.py` / `routers/agent.py`：一次运行一个 trace_id
+  （后台任务用 job_id，上传与提问各生成一个），判断的 job result 也带上提示词版本。
+- 自测脚本：`scripts/check_ai_ledger.py`（账本、成因码、回退留痕、解析重试，不调模型）、
+  `scripts/check_trace_api.py`（账本接口与业务的数字要对得上）。
+- `scripts/regression_check.py`：加端口预检 —— 端口上已有别的实例时直接失败，
+  不再"连上别人的服务然后报 PASS"（这个假阳性在实际回归里真实发生过一次）。
+
 ### 下一阶段（未做，按优先级）
 
-1. **换词再检索**：弱命中时用规则同义词换词重查一次（上限 2 轮），仍不足再降级为待确认。
-2. **判断批量化**：5–8 条一批，把 10 条需求从约 1 分钟压到 20 秒内，并加 token 预算与终止条件。
+1. **判断批量化**：5–8 条一批，把 10 条需求从约 1 分钟压到 20 秒内，并加 token 预算与终止条件；
+   账本现在能给出这一改造前后的实测对比（调用次数、token、耗时）。
+2. **换词再检索**：弱命中时用规则同义词换词重查一次（上限 2 轮），仍不足再降级为待确认。
 3. **检索升级**：SQLite FTS5 / pgvector + BM25 混合，材料分片进索引（现在是全表扫描）。
 4. **跨材料冲突检测**：把同 label 的事实（如工期口径）对齐后比对，输出差异卡片。
-5. **AI 调用账本**：`ai_calls` 表记录 model / prompt_version / tokens / latency / fallback。
+5. **判断结果缓存**：以（需求文本 + 知识库版本 + prompt 版本）为键复用判断，重跑时直接命中。
 
 ## 8. 验收标准
 

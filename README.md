@@ -92,14 +92,16 @@ server/
   app/
     main.py             FastAPI 入口、CORS、启动时初始化种子数据
     config.py           配置（.env / 路径解析 / 开关）
+    prompts.py          四个步骤的提示词 + schema + 版本号（改提示词先改这里）
     db.py               SQLAlchemy engine / session / init_db
     models.py           核心对象（客户、项目、材料、需求、判断、证据、方案、活动…）
     domain.py           状态字典、中文标签词表、标签推断
     seed.py             账号 / 知识库 / 演示客户项目初始化
-    routers/            auth · customers · projects · materials · analysis · agent · dashboard · knowledge
+    routers/            auth · customers · projects · materials · analysis · agent · dashboard · knowledge · traces
     services/
       textin.py         TextIn xParse 客户端（同步 + 异步 + 轮询）
       llm.py            DeepSeek 客户端（JSON 输出、失败重试、规则回退）
+      ai_ledger.py      AI 调用账本（trace_id · token · 耗时 · 失败成因 · 提示词版本）
       parse_pipeline.py 解析结果 → 带页码片段
       retrieval.py      标签 + 关键词混合检索（可替换为向量检索）
       agents.py         需求抽取 / 能力判断 / 售前建议三个 Agent + 证据校验
@@ -109,6 +111,7 @@ src/
                         · MatchingModule + MatchingTab（逐条判断）· JudgementPage（售前建议）
                         · ProjectContextBar（项目栏与证据抽屉）· AgentPanel
 scripts/                测试用 RFP 生成、端到端冒烟测试与沙箱回归（regression_check / uitest_sandbox）
+                        check_ai_ledger（账本与重试自测）· check_trace_api（账本接口验收）
 docs/information-hierarchy.md  界面信息层级原则、逐页精简清单与后续待办
 ```
 
@@ -155,13 +158,27 @@ docs/information-hierarchy.md  界面信息层级原则、逐页精简清单与�
 两条原则：**动作进 Agent，产物留中间页**；**AI 只准备，人做承诺**。
 右侧是核心交互面，内容不随中间页变；中间页是产物面，三个页签只切换看哪份产物。
 
+想算账与复盘，看两个只读接口（都不改数据）：
+
+- `GET /api/projects/{id}/ai-calls` —— 调用次数、token、失败、回退、按步骤分组，
+  用来回答"贵在哪一步"；
+- `GET /api/traces/{trace_id}` —— 一次运行（一次上传 / 一次"从头跑一遍" / 一次提问）的完整调用链，
+  用来回答"这次到底调了什么、哪一步失败、为什么"。
+
 ### 7.2 开发须知（这几条是踩过坑总结的）
 
 - **后端不要开 `--reload`**：这台机器上 WatchFiles 会卡在 `Reloading...` 不真正重启，新路由一直 404。
   改完后端手动重启：停掉 8000 端口的进程，再
   `Start-Process .venv\Scripts\python.exe -ArgumentList "-m","uvicorn","app.main:app","--host","127.0.0.1","--port","8000" -WorkingDirectory server`。
 - **原能力回归**：`python scripts\regression_check.py --with-agent` —— 复制一份库、在 8010 起独立后端、跑完整链路
-  （上传 → 解析 → 抽取 → 确认 → 判断 → 建议 + 对话与审批），跑完自动删临时目录，不碰真实数据。
+  （上传 → 解析 → 抽取 → 确认 → 判断 → 建议 + 对话与审批 + 调用账本），跑完自动删临时目录，不碰真实数据。
+  它会先做**端口预检**：8010 上已经有别的实例（比如上一次没退干净、或另一个会话的沙箱）就直接失败 ——
+  否则会连上别人的实例然后报假 PASS。遇到这种情况换个端口：
+  `$env:FITWISE_SANDBOX_PORT="8021"; python scripts\regression_check.py --with-agent`。
+- **账本与重试自测**：`python scripts\check_ai_ledger.py`（不调模型、不碰真实库，覆盖账本汇总、
+  失败成因码、回退留痕、解析重试）；`python scripts\check_trace_api.py`（对着实例跑，验账本数字与业务对得上）。
+  末尾会打两张**评测分数表**（链路 10 项 / 对话 5 项），其中最关键的是「越界检查：完全支持必须有支持证据」——
+  它守的是这个产品的命门：结论不许比证据乐观。规则见 `scripts/scorecard.py`。
 - **UI 沙箱**：`python scripts\uitest_sandbox.py` —— 复制库并把项目重置到「基线已定、还没判断」，
   再起 8010 后端 + 5199 前端，用来验证只有中途状态才会出现的交互。
 - **演示数据**：`python scripts\demo_reset.py` —— 新建演示客户/项目、传一份合成 RFP、停在「需求待确认」。剧本见 `docs/demo-script.md`。

@@ -279,3 +279,36 @@ class AgentMessage(Base):
     text: Mapped[str] = mapped_column(Text, default="")
     data: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AiCall(Base):
+    """AI / 解析调用账本：成本、可观测、版本追溯共用一张表。
+
+    trace_id 是「一次用户动作」的串联键：材料解析 → 需求抽取 → 每条能力判断 →
+    售前建议 → 对话路由，全部挂在同一个 id 下，所以事后能按「这一次运行」复盘，
+    而不是只能按项目和时间猜。
+
+    prompt_version 记的是 prompts.py 里的步骤版本 —— 改动提示词之后，
+    「这条结论是哪版提示词算出来的」是可回答的（见 docs/agent-core-design.md 第 5 节）。
+    """
+
+    __tablename__ = "ai_calls"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(String(40), default="", index=True)
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    step: Mapped[str] = mapped_column(String(40), default="")  # parse / extract / judge / solution / route
+    provider: Mapped[str] = mapped_column(String(80), default="")  # 模型端点主机名 / rules / local
+    model: Mapped[str] = mapped_column(String(80), default="")
+    prompt_version: Mapped[str] = mapped_column(String(48), default="")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    fallback_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    ok: Mapped[bool] = mapped_column(Boolean, default=True)
+    error_code: Mapped[str] = mapped_column(String(40), default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

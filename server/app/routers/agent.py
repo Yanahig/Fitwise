@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -66,7 +67,10 @@ async def ask_agent(
     message = (payload.message or "").strip()[:MAX_MESSAGE_CHARS]
     if not message:
         raise HTTPException(status_code=400, detail="问题不能为空")
-    result = await agent_router.route_message(db, project=project, message=message)
+    # 每次提问算一次运行：模型调用挂在同一个 trace_id 下，事后可复盘
+    result = await agent_router.route_message(
+        db, project=project, message=message, trace_id=f"ask-{uuid.uuid4().hex[:8]}"
+    )
     db.commit()
     return result
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from ..models import Material, MaterialChunk
-from . import textin
+from . import ai_ledger, textin
 
 logger = logging.getLogger(__name__)
 
@@ -107,26 +108,38 @@ def _local_text_chunks(path: Path) -> list[dict[str, Any]]:
     return chunks
 
 
-async def parse_material(db: Session, material: Material) -> Material:
-    """解析一份材料，写入 markdown 与带页码的片段。"""
+async def parse_material(db: Session, material: Material, *, trace_id: str = "") -> Material:
+    """解析一份材料，写入 markdown 与带页码的片段。
+
+    trace_id 把这一步和后面的抽取/判断/建议串成一次运行（见 services/ai_ledger.py）。
+    失败成因码写进 material.parse_error 前缀与账本：前端可以据此给不同的下一步提示，
+    而不是统一一句"没读出来"。
+    """
     path = Path(material.storage_path)
     material.status = "parsing"
     material.parse_error = ""
     db.flush()
 
+    started = time.perf_counter()
     chunks: list[dict[str, Any]] = []
+    attempts = 0
+    engine = "textin-xparse"
+    error_code = ""
     try:
         if path.suffix.lower() in PLAIN_TEXT_SUFFIXES:
+            engine = "local-text"
+            attempts = 1
             chunks = _local_text_chunks(path)
             material.markdown = path.read_text(encoding="utf-8", errors="ignore")
             material.page_count = max(1, len(chunks))
-            material.parse_engine = "local-text"
+            material.parse_engine = engine
         else:
             document = await textin.parse_file(path, material.filename)
+            attempts = document.attempts
             material.markdown = document.markdown
             material.page_count = document.page_count or 1
             material.textin_file_id = document.file_id
-            material.parse_engine = "textin-xparse"
+            material.parse_engine = engine
             chunks = elements_to_chunks(document.elements) or markdown_to_chunks(
                 document.markdown, material.page_count
             )
@@ -145,9 +158,25 @@ async def parse_material(db: Session, material: Material) -> Material:
         material.status = "parsed"
         material.parsed_at = datetime.now(timezone.utc)
     except Exception as error:  # noqa: BLE001 - 解析失败要落库，前端要能看到原因
-        logger.warning("解析失败 %s：%s", material.filename, error)
+        error_code = textin.classify(error)
+        attempts = max(attempts, int(getattr(error, "attempts", 0) or 0))
+        logger.warning("解析失败 %s（成因 %s）：%s", material.filename, error_code, error)
         material.status = "failed"
-        material.parse_error = str(error)[:500]
+        material.parse_error = f"[{error_code}] {error}"[:500]
+    finally:
+        ai_ledger.record(
+            db,
+            trace_id=trace_id,
+            project_id=material.project_id,
+            step="parse",
+            provider=textin.endpoint_host() if engine == "textin-xparse" else "local",
+            model=engine,
+            attempts=attempts,
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            ok=material.status == "parsed",
+            error_code=error_code,
+            error=material.parse_error,
+        )
 
     db.flush()
     return material

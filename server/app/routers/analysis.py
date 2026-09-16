@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..db import SessionLocal, get_db
 from ..deps import get_current_user
 from ..domain import PROJECT_STAGES, infer_tags
+from ..prompts import JUDGE_PROMPT_VERSION, SOLUTION_PROMPT_VERSION
 from ..models import (
     CapabilityDoc,
     CaseStudy,
@@ -102,7 +103,7 @@ async def _run_extract(job_id: str, project_id: int, actor: str) -> None:
             jobs.fail_job(job_id, "没有解析成功的材料")
             return
         created, blocked = await agents.analyze_requirements(
-            db, project=project, materials=materials, actor=actor
+            db, project=project, materials=materials, actor=actor, trace_id=job_id
         )
         _advance_stage(db, project, "requirements")
         log_activity(
@@ -116,7 +117,7 @@ async def _run_extract(job_id: str, project_id: int, actor: str) -> None:
         db.commit()
         jobs.finish_job(
             job_id,
-            result={"requirements": len(created), **blocked},
+            result={"requirements": len(created), "trace_id": job_id, **blocked},
             message=f"已抽取 {len(created)} 条需求",
         )
     except Exception as error:  # noqa: BLE001
@@ -168,7 +169,9 @@ async def _run_matching(job_id: str, project_id: int, actor: str, requirement_id
                 current=requirement.title,
                 message=f"正在判断（{index + 1}/{len(requirements)}）：{requirement.title}",
             )
-            results.append(await agents.judge_requirement(db, requirement=requirement))
+            results.append(
+                await agents.judge_requirement(db, requirement=requirement, trace_id=job_id)
+            )
             db.commit()
         jobs.update_job(job_id, done=len(requirements), current="", message="匹配完成")
 
@@ -249,6 +252,8 @@ async def _run_matching(job_id: str, project_id: int, actor: str, requirement_id
                 "llm_fallback": fallback,
                 "open_questions": len(project.open_questions or []),
                 "stale_matches_removed": stale_removed,
+                "trace_id": job_id,
+                "prompt_version": JUDGE_PROMPT_VERSION,
             },
             message="匹配完成",
         )
@@ -274,7 +279,7 @@ async def _run_solution(job_id: str, project_id: int, actor: str, problem: str) 
             return
         jobs.update_job(job_id, total=1, current="正在生成解决路径…")
         solution = await agents.compose_solution(
-            db, project=project, matches=matches, problem=problem, actor=actor
+            db, project=project, matches=matches, problem=problem, actor=actor, trace_id=job_id
         )
         _advance_stage(db, project, "solution")
         log_activity(
@@ -286,7 +291,16 @@ async def _run_solution(job_id: str, project_id: int, actor: str, problem: str) 
             project_id=project.id,
         )
         db.commit()
-        jobs.finish_job(job_id, result={"solution_id": solution.id, "version": solution.version}, message="解决路径已生成")
+        jobs.finish_job(
+            job_id,
+            result={
+                "solution_id": solution.id,
+                "version": solution.version,
+                "trace_id": job_id,
+                "prompt_version": SOLUTION_PROMPT_VERSION,
+            },
+            message="解决路径已生成",
+        )
     except Exception as error:  # noqa: BLE001
         db.rollback()
         jobs.fail_job(job_id, str(error))

@@ -18,8 +18,9 @@ import logging
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
+from .. import prompts
 from ..models import MatchResult, Material, Project, Requirement, Solution
-from . import conversation, material_search
+from . import ai_ledger, conversation, material_search
 from .agents import _clip, _humanize
 from .llm import chat_json
 
@@ -37,14 +38,6 @@ ALLOWED_TOOLS: dict[str, str] = {
 APPROVAL_TOOLS: dict[str, str] = {
     "confirm_requirements": "确认需求",
 }
-
-ROUTE_SCHEMA = """{
-  "kind": "answer 或 action",
-  "text": "给用户看的话，不超过 80 字；kind=action 时说明你要做什么",
-  "citation_pages": [引用了材料第几页，没有就空数组],
-  "tool": "run_full_analysis / run_extraction / run_matching / compose_solution / confirm_requirements；kind=answer 时为 null",
-  "scope": "tool=confirm_requirements 时填 all（全部待确认）或 high（只确认高优先级），其余为 null"
-}"""
 
 
 def project_state(db: Session, project: Project) -> dict[str, int]:
@@ -336,7 +329,7 @@ def _normalize(
     }
 
 
-async def route_message(db: Session, *, project: Project, message: str) -> dict:
+async def route_message(db: Session, *, project: Project, message: str, trace_id: str = "") -> dict:
     state = project_state(db, project)
 
     # 一条龙请求：给一份按状态机算出来的多步计划（遇人工闸门就停在闸门前）
@@ -417,41 +410,22 @@ async def route_message(db: Session, *, project: Project, message: str) -> dict:
             )
         )
     evidence = "\n\n".join(blocks) or "（材料里没有找到相关片段）"
-    system = (
-        "你是企业售前助手 Fitwise，负责回答关于这个项目的问题，并在合适的时候提议下一步动作。"
-        "只能使用下面给出的材料片段与项目状态作答；材料里没有写的信息必须说「材料里没有提到」，不要推测。"
-        "只有当用户明确要求推进（重新整理需求 / 做能力判断 / 生成售前建议）时才返回 action，其余一律 answer。"
-        "判断能不能做、给方案是另外的步骤，你只是提议，不要自己下结论。"
-        "用户在打招呼或闲聊时正常回应，不要回一句「材料里没有提到」。"
-        "表达用售前听得懂的口语化中文，不要出现「模型」「检索」「落库」「置信度」这类词。"
-    )
-    user = "\n".join(
-        [
-            f"【项目】{project.name}",
-            "【项目状态】",
-            _state_lines(state),
-            "",
-            "【可用证据】",
-            evidence,
-            "",
-            f"【用户的问题】{message}",
-            "",
-            "【要求】",
-            "1. 回答里只要用到了上面的内容，就必须把对应页码放进 citation_pages；",
-            "2. 上面没有的，直接说没有提到，citation_pages 留空；",
-            "3. 用户只是问信息时不要返回 action；",
-            "4. 动作与研究口径：说「重新分析 / 跑一遍分析」用 run_full_analysis；"
-            "说「整理需求」用 run_extraction；说「能不能做 / 做判断」用 run_matching；"
-            "说「出方案 / 写建议」用 compose_solution；"
-            "说「确认需求 / 都确认了 / 确认高优先级」用 confirm_requirements，"
-            "并在 scope 里填 all 或 high（确认需求需要用户批准，你只负责准备清单）。",
-        ]
+    system = prompts.ROUTE_SYSTEM
+    user = prompts.route_user_prompt(
+        project_name=project.name,
+        state_lines=_state_lines(state),
+        evidence=evidence,
+        message=message,
     )
     payload = await chat_json(
         system=system,
         user=user,
-        schema_hint=ROUTE_SCHEMA,
+        schema_hint=prompts.ROUTE_SCHEMA,
         fallback=lambda: _fallback_route(message, hits, state),
+        trace_id=trace_id,
+        step="route",
+        prompt_version=prompts.ROUTE_PROMPT_VERSION,
+        on_call=lambda entry: ai_ledger.record(db, project_id=project.id, **entry),
     )
     result = _normalize(
         payload,

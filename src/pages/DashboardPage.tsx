@@ -30,13 +30,13 @@ const GUIDE_STEPS = [
     key: 'requirements',
     to: 'requirements',
     title: '需求确认',
-    hint: '逐条核对客户需求，确认后进入判断',
+    hint: '逐条核对客户需求，确认后立刻判断能不能做',
   },
   {
     key: 'judgement',
     to: 'judgement',
     title: '售前建议',
-    hint: '能不能做、风险、下一步与不可承诺的边界',
+    hint: '风险、要问谁，以及不可承诺的边界',
   },
 ];
 

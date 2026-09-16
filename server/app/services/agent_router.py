@@ -97,7 +97,8 @@ def next_step(state: dict[str, int]) -> dict | None:
             "target": "requirements",
         }
     if not state["matches"]:
-        return {"label": "做能力判断", "tool": "run_matching", "blocked": False, "target": "judgement"}
+        # 结论落在需求卡上：判断跑完去需求确认页看，售前建议页只放风险与要问谁
+        return {"label": "做能力判断", "tool": "run_matching", "blocked": False, "target": "requirements"}
     if not state["solutions"]:
         return {"label": "生成售前建议", "tool": "compose_solution", "blocked": False, "target": "judgement"}
     return None

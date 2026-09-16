@@ -877,7 +877,11 @@ export function AgentPanel({
         await refresh();
         setMessages((prev) => [
           ...prev,
-          { id: newId(), role: 'agent', text: `确认了 ${result.confirmed} 条需求，可以开始判断了。` },
+          {
+            id: newId(),
+            role: 'agent',
+            text: `确认了 ${result.confirmed} 条需求，判断结果已经出在每条需求上。`,
+          },
         ]);
         // 确认需求之后后端会自动开始能力判断，跟着那个 job 走
         if (result.job_id) {

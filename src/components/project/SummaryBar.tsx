@@ -14,7 +14,7 @@ export interface SummaryLine {
   target?: string;
   /** 或者跳到另一页（hash 路由） */
   href?: string;
-  /** 或者就地触发一个动作（例如把「能不能做」切到高风险视图） */
+  /** 或者就地触发一个动作（例如把风险清单滚到视野里） */
   onClick?: () => void;
 }
 

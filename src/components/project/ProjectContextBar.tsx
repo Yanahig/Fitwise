@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Match, Project } from '../../api/types';
 import { api } from '../../api/endpoints';
 import type { CapabilityDoc } from '../../api/types';
+import { buildActionGroups } from '../../domain/actions';
 import { useToast } from '../Toast';
 import { IconClose, IconEvidence } from '../icons';
 
@@ -89,7 +90,9 @@ export function ProjectContextBar({
   const moduleCounts: Record<ModuleKey, number> = {
     materials: project.materials?.length ?? 0,
     requirements: project.requirements?.length ?? 0,
-    judgement: matches.length,
+    // 售前建议徽标 = 还没定的事有多少条（要问客户 + 要问内部 + 要同步销售），
+    // 与那一页的标题计数同源 —— 逐条判断的条数在需求确认页上
+    judgement: buildActionGroups(project, matches).total,
   };
 
   return (

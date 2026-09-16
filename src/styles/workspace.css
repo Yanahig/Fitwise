@@ -3100,6 +3100,38 @@ details[open] > summary.case-card__more::before {
   align-items: center;
 }
 
+/* 风险分区直接复用行动建议的分组卡：折叠箭头与点击区都一样 */
+summary.action-group__head {
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.action-group__head::-webkit-details-marker {
+  display: none;
+}
+
+/* 风险条目列表：一条一个块，标题 + 详情 + 建议应对 + 回指需求 */
+.risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.risk-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.risk-item__link {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+}
+
 /* 折叠指示：展开时箭头朝上 */
 .group-chevron {
   width: 6px;
@@ -3490,6 +3522,138 @@ details[open] > summary .group-chevron {
 
 .req-item__actions .link-btn:hover {
   color: var(--color-accent);
+}
+
+/* 需求卡上的结论区：点「确认」之后原地长出来的那一块（支持情况 + 风险情况） */
+.req-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-left: 3px solid var(--status-unknown-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+/* 左侧色条直接说结论分档：绿=完全支持，黄=有前提，红=能力缺口，灰=待补依据 */
+.req-result--full {
+  border-left-color: var(--status-full-border);
+}
+
+.req-result--partial {
+  border-left-color: var(--status-partial-border);
+}
+
+.req-result--none {
+  border-left-color: var(--status-none-border);
+}
+
+.req-result__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+}
+
+.req-result__headline {
+  flex: 1 1 220px;
+  min-width: 0;
+  color: var(--color-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.req-result__more {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: auto;
+  color: var(--color-muted-foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.req-result__more:hover {
+  color: var(--color-accent);
+}
+
+.req-result__risks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.req-result__risk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.req-result__risk--high {
+  background: var(--status-none-bg);
+}
+
+.req-result__risk--medium {
+  background: var(--status-partial-bg);
+}
+
+.req-result__risk-title {
+  color: var(--color-foreground);
+  font-weight: 600;
+}
+
+.req-result__risk-fix {
+  flex-basis: 100%;
+  color: var(--color-secondary);
+  font-size: var(--text-xs);
+}
+
+.req-result__detail {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.req-result--pending {
+  color: var(--color-muted-foreground);
+  font-size: var(--text-sm);
+}
+
+.req-result__missing {
+  display: block;
+  margin-top: var(--space-2);
+}
+
+/* 卡片上的锚点：结论条点过来落在卡顶，自身不占高度 */
+.anchor-mark {
+  display: block;
+  height: 0;
+  scroll-margin-top: 96px;
+}
+
+/* 材料页「材料里的需求」的状态标签：草稿 / 已确认 */
+.fact-req__status {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--status-unknown-bg);
+  color: var(--status-unknown-fg);
+  font-size: 10.5px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.fact-req__status--done {
+  background: var(--status-full-bg);
+  color: var(--status-full-fg);
 }
 
 .section-open__actions {

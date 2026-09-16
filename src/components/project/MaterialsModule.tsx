@@ -156,6 +156,15 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
   const hasMaterials = materials.length > 0;
   const requirementCountOf = (materialId: number) =>
     requirements.filter((item) => item.source.material_id === materialId).length;
+  /**
+   * 材料里读出来的需求：在材料页只作**事实留档**（草稿在前、已确认在后）。
+   * 核对与能力判断在需求确认页 —— 那边是动作视图，这边是"材料说了什么"。
+   * 人工新增的需求不是材料事实，所以不进这一块。
+   */
+  const materialRequirements = [
+    ...requirements.filter((item) => item.source.material_id && item.status !== 'confirmed'),
+    ...requirements.filter((item) => item.source.material_id && item.status === 'confirmed'),
+  ];
 
   const retry = async (material: Material) => {
     try {
@@ -562,6 +571,88 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                 </section>
               ))}
             </div>
+          )}
+        </section>
+      ) : null}
+
+      {/* 材料里的需求：材料里读出来的要求，在这里只作事实记录（含还没确认的草稿），
+          同一条需求在「需求确认」里被核对、确认、做能力判断 —— 一份事实，两个视图 */}
+      {hasMaterials ? (
+        <section className="section-open" id="material-requirements">
+          <header className="section-open__head">
+            <div className="section-open__titleline">
+              <h3>
+                材料里的需求
+                <span className="fact-group__count">{materialRequirements.length}</span>
+              </h3>
+              <HelpTip text="材料里读出来的要求，在这里只作事实留档、不算数；去「需求确认」逐条核对，确认后才进入能力判断。" />
+            </div>
+            <div className="section-open__actions">
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => {
+                  window.location.hash = `/projects/${project.id}/requirements`;
+                }}
+              >
+                去需求确认
+              </button>
+            </div>
+          </header>
+
+          {materialRequirements.length === 0 ? (
+            <p className="empty-inline">
+              还没从材料里读出需求。点右上角的「重新提取要点」，或去需求确认页手动新增。
+            </p>
+          ) : (
+            <ul className="highlight-list">
+              {materialRequirements.map((item) => (
+                <li key={item.id} className="highlight-item">
+                  <div className="highlight-item__main">
+                    <span className="highlight-item__value">
+                      {item.title}
+                      <span
+                        className={`fact-req__status${
+                          item.status === 'confirmed' ? ' fact-req__status--done' : ''
+                        }`}
+                      >
+                        {item.status === 'confirmed' ? '已确认' : '草稿'}
+                      </span>
+                    </span>
+                    {item.detail ? <p className="req-item__detail">{item.detail}</p> : null}
+                    <div className="req-brief__meta">
+                      <button
+                        type="button"
+                        className="link-btn req-brief__view"
+                        title={[
+                          item.source.document_name,
+                          item.source.page ? `第 ${item.source.page} 页` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        onClick={() => openSource(item.source.material_id, item.source.page)}
+                      >
+                        <IconEvidence width={13} height={13} />
+                        {[
+                          materials.length > 1 ? item.source.document_name ?? '' : '',
+                          item.source.page ? `第 ${item.source.page} 页` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || '来源未标注'}
+                      </button>
+                      {item.priority === 'high' ? (
+                        <span className="hint hint--inline">高优先级</span>
+                      ) : null}
+                      {item.edited ? (
+                        <span className="hint hint--inline" title="人工改过：重新整理时这条会保留">
+                          已人工修改
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       ) : null}

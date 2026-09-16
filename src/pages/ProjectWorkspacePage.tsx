@@ -7,7 +7,6 @@ import { useToast } from '../components/Toast';
 import { AgentPanel } from '../components/project/AgentPanel';
 import { ProjectContextBar } from '../components/project/ProjectContextBar';
 import type { ModuleKey } from '../components/project/ProjectContextBar';
-import { MatchingModule } from '../components/project/MatchingModule';
 import { MaterialsModule } from '../components/project/MaterialsModule';
 import { RequirementsModule } from '../components/project/RequirementsModule';
 import { JudgementPage } from './JudgementPage';
@@ -68,7 +67,7 @@ export function ProjectWorkspacePage({
   }, [tab, projectId, navigate]);
 
   /**
-   * 跨功能跳转：售前建议里点条目前的「待澄清」标记，切到需求确认页并滚到对应分区。
+   * 跨功能跳转：售前建议里点「看这条需求」、判断详情里点「去看全部」，都会切页并滚到锚点。
    * 用事件而不是层层传回调 —— 页面之间只认"去哪个 tab、滚到哪个锚点"。
    */
   useEffect(() => {
@@ -214,23 +213,12 @@ export function ProjectWorkspacePage({
       {moduleTab === 'judgement' ? (
         <div className="workspace-grid">
           <div className="workspace-grid__main">
+            {/* 逐条判断在需求卡上（需求确认页）；这一页负责结论、风险与「要问谁」 */}
             <JudgementPage
               project={project}
               matches={matches}
               busy={busy}
-              canRun={(project.counts?.requirements_confirmed ?? 0) > 0}
-              onRerun={() => void runTask(() => api.runMatching(project.id), '能力判断')}
-              // 版面顺序就是信息流：结论（三句概括）→ 能不能做（逐条判断）→ 风险 → 行动
-              detail={
-                <MatchingModule
-                  project={project}
-                  matches={matches}
-                  refresh={refresh}
-                  runTask={runTask}
-                  job={job}
-                  busy={busy}
-                />
-              }
+              onGenerate={() => void runTask(() => api.generateSolution(project.id, ''), '售前建议')}
             />
           </div>
           <AgentPanel

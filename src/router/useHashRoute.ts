@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { trackPageView } from '../api/telemetry';
 
 export interface Route {
   path: string;
@@ -33,5 +34,11 @@ export function useHashRoute() {
   }, []);
 
   const segments = path.split('/').filter(Boolean);
+
+  // 每次换页记一条：去了哪、从哪来、上一页停了多久（诊断"卡在哪一步"最有用的一条）
+  useEffect(() => {
+    trackPageView(path);
+  }, [path]);
+
   return { path, segments, navigate };
 }

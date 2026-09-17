@@ -46,6 +46,21 @@ ssh aifinance-prod "journalctl -u fitwise -n 100 --no-pager"
 ssh aifinance-prod "curl -s http://127.0.0.1:8100/api/health-check"
 ```
 
+### 有人反馈"点了没反应"时怎么查（诊断事件）
+
+前端埋点只记元数据（动作、状态、耗时、版本、路由），不记材料与需求正文。
+先拿一个令牌，再看事件：
+
+```bash
+TOKEN=$(ssh aifinance-prod "curl -s -X POST http://127.0.0.1:8100/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"presales@fitwise.local\",\"password\":\"fitwise123\"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)[\"token\"])'")
+ssh aifinance-prod "curl -s -H 'Authorization: Bearer $TOKEN' 'http://127.0.0.1:8100/api/events?limit=50'"
+ssh aifinance-prod "curl -s -H 'Authorization: Bearer $TOKEN' 'http://127.0.0.1:8100/api/projects/1/events?limit=100'"
+```
+
+五个事件：`client_boot`（哪一版、什么浏览器）、`page_view`（停在哪一页、停了多久）、
+`api_failed`（哪个接口、状态码、耗时）、`action_finished`（提取 / 匹配 / 生成建议的结果与耗时）、
+`client_error`（前端报错）。事件表只保留最近 5000 条，超了自动删最旧的，不用管运维。
+
 ### 只更新前端
 
 ```powershell

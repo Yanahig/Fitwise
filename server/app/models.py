@@ -262,6 +262,31 @@ class Activity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class Event(Base):
+    """前端诊断事件：出问题时用来还原"用户当时在哪、点了什么、什么状态"。
+
+    三条规矩：
+    1. **只记元数据**（动作名、状态码、耗时、版本、路由），材料原文 / 需求描述 / 聊天内容
+       这类正文永远不进这张表；
+    2. **失败静默**：写不进就算了，绝不让埋点影响业务；
+    3. 和 `activities` 分开：那边是"谁做了什么决定"（产品留痕，长期有效），
+       这边是"页面当时什么状态"（诊断现场，可以随时清）。
+    """
+
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_name: Mapped[str] = mapped_column(String(80), default="")
+    project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(48), index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
 class AgentMessage(Base):
     """对话消息（项目级）。
 

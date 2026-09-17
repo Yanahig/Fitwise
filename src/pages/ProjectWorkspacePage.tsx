@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, pollJob } from '../api/endpoints';
+import { track } from '../api/telemetry';
 import type { Job, Match, Project } from '../api/types';
 import { PipelineProgress, jobLabel } from '../components/PipelineProgress';
 import { SkeletonCard } from '../components/Skeleton';
@@ -93,20 +94,41 @@ export function ProjectWorkspacePage({
 
   const runTask = useCallback(
     async (starter: () => Promise<{ job_id: string }>, label: string) => {
+      const startedAt = Date.now();
       setBusy(true);
       setError(null);
       try {
         const { job_id } = await starter();
         const finished = await pollJob(job_id, setJob);
         if (finished.status === 'failed') {
+          // 失败也留痕：定位问题时"哪一步、哪个 job、跑了多久"比错误文案更有用
+          track('action_finished', {
+            label,
+            job: job_id,
+            status: 'failed',
+            ms: Date.now() - startedAt,
+            message: String(finished.error ?? '').slice(0, 120),
+          });
           setError(`${label}失败：${finished.error}`);
           return finished;
         }
         await refresh();
+        track('action_finished', {
+          label,
+          job: job_id,
+          status: 'ok',
+          ms: Date.now() - startedAt,
+        });
         toast.push(`${label}完成`, 'success');
         return finished;
       } catch (taskError) {
         const message = taskError instanceof Error ? taskError.message : `${label}失败`;
+        track('action_finished', {
+          label,
+          status: 'error',
+          ms: Date.now() - startedAt,
+          message: message.slice(0, 120),
+        });
         setError(message);
         toast.push(message, 'error');
         return null;

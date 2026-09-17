@@ -169,6 +169,16 @@ docs/acceptance-checklist.md   验收清单：十项可当场验证的验收（�
 - `GET /api/traces/{trace_id}` —— 一次运行（一次上传 / 一次"从头跑一遍" / 一次提问）的完整调用链，
   用来回答"这次到底调了什么、哪一步失败、为什么"。
 
+出问题时还有一个**诊断现场**（前端埋点，只记元数据、不记任何正文）：
+
+- `GET /api/events?limit=50` —— 全局最近事件；`?name=api_failed` 只看接口失败；
+- `GET /api/projects/{id}/events` —— 某个项目的事件。
+
+五个事件：`client_boot`（构建版本 / 后端地址 / 浏览器，回答"你看到的是哪一版"）、
+`page_view`（去了哪页、从哪来、上一页停了几秒）、`api_failed`（路径 / 状态码 / 耗时 / 错误文案，
+**不含请求体**）、`action_finished`（提取 / 匹配 / 生成建议 / 新建分析的结果与耗时，带 job id）、
+`client_error`（前端报错与未捕获的 Promise）。上报失败静默、不阻塞交互，只发到自己的后端（不接第三方 SDK）。
+
 ### 7.2 开发须知（这几条是踩过坑总结的）
 
 - **后端不要开 `--reload`**：这台机器上 WatchFiles 会卡在 `Reloading...` 不真正重启，新路由一直 404。

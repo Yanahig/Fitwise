@@ -7,6 +7,7 @@ import { SkeletonRows } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { IconCheck, IconCompass, IconFile } from '../components/icons';
 import { pollJob } from '../api/endpoints';
+import { track } from '../api/telemetry';
 
 const INTAKE_STEPS = [
   '已读取客户材料',
@@ -100,6 +101,7 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
 
   /** 交给 Fitwise：建客户 → 建项目 → 上传材料 → 自动跑完整分析链，用户只点这一次 */
   const submitIntake = async () => {
+    const startedAt = Date.now();
     setIntakeBusy(true);
     setIntakeRunning(true);
     setIntakeIndex(0);
@@ -144,8 +146,24 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
 
       toast.push('分析完成，正在打开售前建议', 'success');
       navigate(`/projects/${project.id}/judgement`);
+      // 一条龙跑完是这一页最重的动作：成功也留一条（诊断"新建分析卡在哪一步"）
+      track('action_finished', {
+        label: '新建分析',
+        status: 'ok',
+        ms: Date.now() - startedAt,
+        materials: queuedMaterials.length,
+      });
     } catch (error) {
-      toast.push(error instanceof Error ? error.message : '分析失败，请重试', 'error');
+      const message = error instanceof Error ? error.message : '分析失败，请重试';
+      // 失败时记到哪一步断的（步骤序号 = 材料读取 1 / 整理需求 2 / 能力匹配 3）
+      track('action_finished', {
+        label: '新建分析',
+        status: 'error',
+        step: intakeIndex,
+        ms: Date.now() - startedAt,
+        message: message.slice(0, 120),
+      });
+      toast.push(message, 'error');
     } finally {
       setIntakeRunning(false);
       setIntakeBusy(false);

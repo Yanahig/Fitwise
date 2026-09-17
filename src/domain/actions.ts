@@ -36,13 +36,40 @@ export interface ActionGroups {
 const ACTION_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 /**
- * 要同步销售的动作排序：先看优先级，再看截止日期（越早越前）。
- * 「下一步」那一句取的就是排完序的第一条 —— 所以顺序必须是"最该先做的排最前"，
- * 而不是模型写出来的先后。
+ * 截止时间可能是两种写法：绝对日期（2026-06-30）或相对口径（3个工作日内）。
+ * 两者量纲不同，不做换算 —— 只把同类的拿来比，不同类的保持模型给的先后。
  */
-const byPriorityThenDue = (a: ActionRow, b: ActionRow): number =>
-  (ACTION_RANK[a.priority ?? ''] ?? 1) - (ACTION_RANK[b.priority ?? ''] ?? 1) ||
-  (a.due || '9999-99-99').localeCompare(b.due || '9999-99-99');
+const dueKey = (due: string | undefined): number | null => {
+  if (!due) return null;
+  const iso = due.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return Number(`${iso[1]}${iso[2]}${iso[3]}`);
+  const workdays = due.match(/(\d+)\s*个?工作日/);
+  return workdays ? Number(workdays[1]) : null;
+};
+
+const isIsoDate = (due: string | undefined) => Boolean(due && /^\d{4}-\d{2}-\d{2}/.test(due));
+
+/** 展示用：日期只留 月-日；「3个工作日内」这类说法原样保留（太长就截断） */
+export const dueLabel = (due: string | undefined): string => {
+  if (!due) return '';
+  if (isIsoDate(due)) return due.slice(5, 10);
+  return due.length > 6 ? `${due.slice(0, 6)}…` : due;
+};
+
+/**
+ * 要同步销售的动作排序：先看优先级，再看截止时间（同一种写法才比，越早越前）。
+ * 「下一步」那一句取的就是排完序的第一条 —— 顺序必须是"最该先做的排最前"，
+ * 而不是模型写出来的先后；不同写法的截止时间互不比较，保持原顺序（稳定排序）。
+ */
+const byPriorityThenDue = (a: ActionRow, b: ActionRow): number => {
+  const rank = (row: ActionRow) => ACTION_RANK[row.priority ?? ''] ?? 1;
+  if (rank(a) !== rank(b)) return rank(a) - rank(b);
+  const aKey = dueKey(a.due);
+  const bKey = dueKey(b.due);
+  if (aKey === null || bKey === null) return 0;
+  if (isIsoDate(a.due) !== isIsoDate(b.due)) return 0;
+  return aKey - bKey;
+};
 
 export function buildActionGroups(project: Project, matches: Match[]): ActionGroups {
   const solution = project.solution;

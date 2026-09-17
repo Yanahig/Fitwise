@@ -1,5 +1,5 @@
 import type { Match, Priority, Project } from '../api/types';
-import { buildActionGroups, promiseBoundaries } from '../domain/actions';
+import { buildActionGroups, dueLabel, promiseBoundaries } from '../domain/actions';
 import type { ActionRow } from '../domain/actions';
 import { RISK_LEVEL_LABEL, RISK_LEVELS } from '../domain/risk';
 import type { RiskLevel, SolutionRisk } from '../domain/risk';
@@ -137,16 +137,17 @@ export function JudgementPage({
    * 这样 30 个字的概括行里也放得下，点一下直接落到那一条动作上。
    */
   const nextAction = actions.sales[0];
-  const shortActionText = (text: string) => {
-    const head = text.split(/[：:，,]/)[0].trim();
-    return head.length >= 6 ? head : text;
+  /** 只留动作的第一个短句，太长的再截一刀 —— 概括行只有 30 个字，责任人与日期得放得下 */
+  const shortActionText = (text: string, limit = 12) => {
+    const head = text.split(/[：:，,；;]/)[0].trim();
+    const base = head.length >= 6 ? head : text;
+    return base.length > limit ? `${base.slice(0, limit)}…` : base;
   };
+  const nextActionMeta = nextAction
+    ? [nextAction.owner, dueLabel(nextAction.due)].filter(Boolean).join(' · ')
+    : '';
   const nextStepText = nextAction
-    ? `${shortActionText(nextAction.text)}${
-        [nextAction.owner, nextAction.due?.slice(5)].filter(Boolean).length
-          ? `（${[nextAction.owner, nextAction.due?.slice(5)].filter(Boolean).join(' · ')}）`
-          : ''
-      }`
+    ? `${shortActionText(nextAction.text)}${nextActionMeta ? `（${nextActionMeta}）` : ''}`
     : actions.customer.length
       ? `先问客户：${shortActionText(actions.customer[0].text)}`
       : '还没有下一步建议，先生成一份建议';

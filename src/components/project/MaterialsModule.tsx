@@ -3,6 +3,7 @@ import type { Material, ProjectHighlight } from '../../api/types';
 import type { ProjectTabProps } from '../../pages/ProjectWorkspacePage';
 import { api } from '../../api/endpoints';
 import { MATERIAL_ACCEPT, MATERIAL_TYPE_LABEL, isSupportedFile, materialStatusLabel, materialType } from '../../domain/materials';
+import { PRIORITY_TAG } from '../../domain/status';
 import { useToast } from '../Toast';
 import { useAuth } from '../../state/AuthContext';
 import { HelpTip } from '../HelpTip';
@@ -128,10 +129,7 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
   const highlights = project.highlights ?? [];
   const visibleHighlights = highlights.filter((item) => !item.ignored);
   const ignoredCount = highlights.length - visibleHighlights.length;
-  /**
-   * 要点按内容分类分区：顺序固定（从「这是什么项目」到「交付环境」再到「决策链」），
-   * 便于扫读；分区标题已经说明分类，条目上不再重复标签。
-   */
+  /** 事实分类的固定顺序：从「这是什么项目」到「交付环境」再到「决策链」，便于扫读 */
   const FACT_LABEL_ORDER = [
     '客户与项目',
     '建设范围',
@@ -142,27 +140,32 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
     '决策链',
     '其他要点',
   ];
-  const factGroups = FACT_LABEL_ORDER.map((label) => ({
-    label,
-    items: highlights
-      .map((item, index) => ({ item, index }))
-      .filter(({ item }) => {
-        if (item.ignored) return false;
-        // 万一出现没见过的标签，归到「其他要点」，不让它静默消失
-        const key = FACT_LABEL_ORDER.includes(item.label) ? item.label : '其他要点';
-        return key === label;
-      }),
-  })).filter((group) => group.items.length > 0);
+  /**
+   * 项目要点排成一张卡片清单，和需求确认同一套版式：
+   * 分类从"分组标题"变成每张卡左侧的标签，次序仍按固定分类顺序。
+   * 认不出来的标签归到「其他要点」，不让它静默消失。
+   */
+  const factLabel = (label: string) => (FACT_LABEL_ORDER.includes(label) ? label : '其他要点');
+  const visibleFacts = highlights
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !item.ignored)
+    .sort(
+      (a, b) =>
+        FACT_LABEL_ORDER.indexOf(factLabel(a.item.label)) -
+          FACT_LABEL_ORDER.indexOf(factLabel(b.item.label)) || a.index - b.index,
+    );
+  const factKinds = new Set(visibleFacts.map(({ item }) => factLabel(item.label)));
   const hasMaterials = materials.length > 0;
   const requirementCountOf = (materialId: number) =>
     requirements.filter((item) => item.source.material_id === materialId).length;
   /**
-   * 材料里读出来的需求：在材料页只作**事实留档**。
+   * 项目需求：材料里读出来的需求，在材料页只作**事实留档**。
    * 核对与能力判断在需求确认页 —— 那边是动作视图，这边是"材料说了什么"。
    * 顺序保持材料里的抽取次序（确认与否只改标签、不改位置）；
    * 人工新增的需求不是材料事实，所以不进这一块。
    */
   const materialRequirements = requirements.filter((item) => item.source.material_id);
+  const draftCount = materialRequirements.filter((item) => item.status !== 'confirmed').length;
 
   const retry = async (material: Material) => {
     try {
@@ -264,11 +267,18 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
           {
             label: '项目要点',
             text: visibleHighlights.length
-              ? `${visibleHighlights.length} 条，分 ${factGroups.length} 类${
-                  factGroups[0] ? `（${factGroups[0].label}最多：${factGroups[0].items.length} 条）` : ''
-                }`
+              ? `${visibleHighlights.length} 条，分 ${factKinds.size} 类`
               : '还没有摘出要点',
             target: 'project-facts',
+          },
+          {
+            label: '项目需求',
+            text: materialRequirements.length
+              ? `${materialRequirements.length} 条${
+                  draftCount ? `（草稿 ${draftCount}）` : ''
+                }`
+              : '材料里还没读出需求',
+            target: 'project-requirements',
           },
           {
             label: '下一步',
@@ -359,9 +369,22 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
           ) : null}
           {pasting ? renderPastePanel() : null}
 
-          {/* 已上传的材料：只留「是什么、读得怎么样、去哪看原文」 */}
+          {/* 已上传的材料：清单默认展开、可折叠 —— 材料多了以后，收起来才看得见下面的阅读结果 */}
           {hasMaterials ? (
-            <ul className="asset-list material-list">
+            <details className="asset-collapse" open>
+              <summary className="asset-collapse__head">
+                <span className="asset-collapse__title">已上传材料</span>
+                <span className="hint hint--inline">
+                  {totalPages ? `${totalPages} 页 · ` : ''}
+                  {failed.length
+                    ? `${failed.length} 份读取失败`
+                    : parsed.length < materials.length
+                      ? `${materials.length - parsed.length} 份读取中`
+                      : '全部已读取'}
+                </span>
+                <span className="group-chevron" aria-hidden="true" />
+              </summary>
+              <ul className="asset-list material-list">
             {materials.map((item) => (
               <li
                 key={item.id}
@@ -405,7 +428,8 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                 </span>
               </li>
             ))}
-            </ul>
+              </ul>
+            </details>
           ) : (
             <p className="empty-inline">还没有材料。把文件拖到上面的虚线框，或者点「上传材料」。</p>
           )}
@@ -453,18 +477,14 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
               还没有项目要点，点右上角的「提取要点」。
             </p>
           ) : (
-            <div className="fact-groups">
-              {factGroups.map((group) => (
-                <section key={group.label} className="fact-group">
-                  <h4 className="fact-group__head">
-                    {group.label}
-                    <span className="fact-group__count">{group.items.length}</span>
-                  </h4>
-                  <ul className="highlight-list">
-                    {group.items.map(({ item, index }) => (
-                      <li key={`${item.label}-${index}`} className="highlight-item">
+            <ul className="req-brief">
+              {visibleFacts.map(({ item, index }) => (
+                <li key={`${item.label}-${index}`} className="req-item">
+                  {/* 分类从"分组标题"变成卡片左侧的标签：一条事实一张卡，和需求确认同一套版式 */}
+                  <span className="req-brief__p req-brief__p--fact">{factLabel(item.label)}</span>
+                  <div className="req-brief__main">
                     {editingIndex === index ? (
-                      <div className="highlight-item__edit">
+                      <div className="edit-stack">
                         <input
                           className="textarea"
                           value={draftValue}
@@ -501,12 +521,12 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                         </div>
                       </div>
                     ) : (
-                      <div className="highlight-item__main">
-                        <span className="highlight-item__value">{item.value}</span>
+                      <>
+                        <span className="req-brief__title">{item.value}</span>
                         <div className="req-brief__meta">
                           <button
                             type="button"
-                            className="link-btn"
+                            className="link-btn req-brief__view"
                             title={[
                               item.source_material_name,
                               item.source_page ? `第 ${item.source_page} 页` : '',
@@ -528,7 +548,7 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                               '来源未标注'}
                           </button>
                           {item.edited ? (
-                            <span className="asset-tag asset-tag--inferred">人工修正</span>
+                            <span className="hint hint--inline">已人工修改</span>
                           ) : null}
                           <details className="card-menu">
                             <summary aria-label="更多操作">···</summary>
@@ -561,26 +581,24 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                             </div>
                           </details>
                         </div>
-                      </div>
+                      </>
                     )}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </section>
       ) : null}
 
-      {/* 材料里的需求：材料里读出来的要求，在这里只作事实记录（含还没确认的草稿），
-          同一条需求在「需求确认」里被核对、确认、做能力判断 —— 一份事实，两个视图 */}
+      {/* 项目需求：材料里读出来的要求，在这里只作事实记录（含还没确认的草稿），
+          版式与需求确认页的需求卡一致；同一条需求在「需求确认」里被核对、确认、做能力判断 */}
       {hasMaterials ? (
-        <section className="section-open" id="material-requirements">
+        <section className="section-open" id="project-requirements">
           <header className="section-open__head">
             <div className="section-open__titleline">
               <h3>
-                材料里的需求
+                项目需求
                 <span className="fact-group__count">{materialRequirements.length}</span>
               </h3>
               <HelpTip text="材料里读出来的要求，在这里只作事实留档、不算数；去「需求确认」逐条核对，确认后才进入能力判断。" />
@@ -603,19 +621,22 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
               还没从材料里读出需求。点右上角的「重新提取要点」，或去需求确认页手动新增。
             </p>
           ) : (
-            <ul className="highlight-list">
+            <ul className="req-brief">
               {materialRequirements.map((item) => (
-                <li key={item.id} className="highlight-item">
-                  <div className="highlight-item__main">
-                    <span className="highlight-item__value">
+                <li
+                  key={item.id}
+                  className={`req-item${item.status === 'confirmed' ? '' : ' req-item--draft'}`}
+                >
+                  <span className={`req-brief__p req-brief__p--${item.priority}`}>
+                    {PRIORITY_TAG[item.priority] ?? 'P1'}
+                  </span>
+                  <div className="req-brief__main">
+                    <span className="req-brief__title">
                       {item.title}
-                      <span
-                        className={`fact-req__status${
-                          item.status === 'confirmed' ? ' fact-req__status--done' : ''
-                        }`}
-                      >
-                        {item.status === 'confirmed' ? '已确认' : '草稿'}
-                      </span>
+                      {/* 只标草稿：已确认的在这张清单里是常态，不用每条都挂一个「已确认」 */}
+                      {item.status === 'confirmed' ? null : (
+                        <span className="req-brief__draft">草稿</span>
+                      )}
                     </span>
                     {item.detail ? <p className="req-item__detail">{item.detail}</p> : null}
                     <div className="req-brief__meta">
@@ -638,9 +659,6 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                           .filter(Boolean)
                           .join(' · ') || '来源未标注'}
                       </button>
-                      {item.priority === 'high' ? (
-                        <span className="hint hint--inline">高优先级</span>
-                      ) : null}
                       {item.edited ? (
                         <span className="hint hint--inline" title="人工改过：重新整理时这条会保留">
                           已人工修改

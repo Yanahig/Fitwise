@@ -56,8 +56,6 @@ export function RequirementsModule({
   const parsedMaterials = materials.filter((item) => item.status === 'parsed');
   const questions = project.open_questions ?? [];
   const judgementQuestions = questions.filter((item) => summarizeOpenQuestion(item).affectsJudgement);
-  const customerQuestions = questions.filter((item) => (item.owner || '客户') !== '内部').length;
-  const internalQuestions = questions.length - customerQuestions;
   const matchByRequirement = new Map(matches.map((item) => [item.requirement_id, item]));
   const solutionRisks = project.solution?.risks ?? [];
   /** 只有一份材料时不需要在每条需求上重复文件名，页码才是要找的东西 */
@@ -424,14 +422,8 @@ export function RequirementsModule({
             text: statusText,
             target: 'requirements-list',
           },
-          {
-            label: '待澄清',
-            // 问题池搬去售前建议页：这一句是入口，点一下就过去
-            text: questions.length
-              ? `${questions.length} 处（问客户 ${customerQuestions} · 内部 ${internalQuestions}），在售前建议`
-              : '暂时没有待澄清问题',
-            href: `/projects/${project.id}/judgement`,
-          },
+          // 待澄清的统计不在这里：问题池住在售前建议的「要问谁」里，统计跟着它走。
+          // 这一页只在清单底下留一行入口（见页面底部），核对需求的时候不会断线。
         ]}
         action={
           inferred.length

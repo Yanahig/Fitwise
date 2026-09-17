@@ -135,11 +135,23 @@ export function JudgementPage({
    * 这一页只留"还剩什么没定"（风险 / 下一步）。
    */
   const nextActionText = actions.sales[0]?.text ?? actions.customer[0]?.text ?? '还没有下一步建议，先生成一份建议';
+  /** 待澄清统计跟着「要问谁」走：需求页只在清单底下留一行入口，这里才是它的家 */
+  const openQuestions = project.open_questions ?? [];
+  const customerQuestionCount = openQuestions.filter((item) => (item.owner || '客户') !== '内部').length;
   const summaryLines: SummaryLine[] = [
     {
       label: '风险',
       text: `${risks.length} 条风险，其中 ${highRiskCount} 条高影响`,
       target: 'advice-risks',
+    },
+    {
+      label: '待澄清',
+      text: openQuestions.length
+        ? `${openQuestions.length} 处（问客户 ${customerQuestionCount} · 内部 ${
+            openQuestions.length - customerQuestionCount
+          }）`
+        : '暂时没有待澄清问题',
+      target: 'judgement-actions',
     },
     {
       label: '下一步',

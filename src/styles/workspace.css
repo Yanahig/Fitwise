@@ -2022,23 +2022,7 @@
   margin-top: var(--space-1);
 }
 
-/* 项目要点：按内容分类分区，分区标题带数量，条目上不再重复标签 */
-.fact-groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.fact-group__head {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  margin-bottom: var(--space-2);
-  color: var(--color-secondary);
-  font-size: var(--text-base);
-  font-weight: 600;
-}
-
+/* 分区标题上的数量徽标：项目要点 / 项目需求 / 需求 / 风险都用它 */
 .fact-group__count {
   padding: 1px 7px;
   border-radius: var(--radius-full);
@@ -3442,6 +3426,16 @@ details[open] > summary .group-chevron {
   color: var(--color-muted-foreground);
 }
 
+/* 项目要点卡左侧的标签：不是优先级、也不是状态，是事实分类，所以不上状态色 */
+.req-brief__p--fact {
+  min-width: auto;
+  padding: 2px var(--space-2);
+  background: var(--color-surface-2);
+  color: var(--color-tertiary-foreground);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .req-brief__main {
   min-width: 0;
 }
@@ -3639,21 +3633,36 @@ details[open] > summary .group-chevron {
   scroll-margin-top: 96px;
 }
 
-/* 材料页「材料里的需求」的状态标签：草稿 / 已确认 */
-.fact-req__status {
-  margin-left: var(--space-2);
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--status-unknown-bg);
-  color: var(--status-unknown-fg);
-  font-size: 10.5px;
-  font-weight: 600;
-  vertical-align: middle;
+/* 已上传材料的折叠块：收起后只留一行「几页 · 读得怎么样」 */
+.asset-collapse {
+  margin-top: var(--space-3);
 }
 
-.fact-req__status--done {
-  background: var(--status-full-bg);
-  color: var(--status-full-fg);
+.asset-collapse__head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  min-height: 28px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.asset-collapse__head::-webkit-details-marker {
+  display: none;
+}
+
+.asset-collapse__title {
+  color: var(--color-secondary);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.asset-collapse__head .hint {
+  margin-right: auto;
+}
+
+.asset-collapse .material-list {
+  margin-top: var(--space-2);
 }
 
 .section-open__actions {
@@ -4981,43 +4990,6 @@ details[open] > summary .group-chevron {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-}
-
-.highlight-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--space-3);
-}
-
-.highlight-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-soft);
-  /* 圆角与材料行、判断条目统一 */
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.highlight-item__label {
-  color: var(--color-tertiary-foreground);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.highlight-item__main,
-.highlight-item__edit {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.highlight-item__value {
-  color: var(--color-foreground);
-  font-size: var(--text-md);
-  font-weight: 500;
-  line-height: 1.5;
 }
 
 /* ---------------- 信息层级：页面只留结论，解释按需展开 ---------------- */

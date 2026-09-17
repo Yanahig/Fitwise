@@ -3,7 +3,7 @@ import type { Material, ProjectHighlight } from '../../api/types';
 import type { ProjectTabProps } from '../../pages/ProjectWorkspacePage';
 import { api } from '../../api/endpoints';
 import { MATERIAL_ACCEPT, MATERIAL_TYPE_LABEL, isSupportedFile, materialStatusLabel, materialType } from '../../domain/materials';
-import { PRIORITY_TAG } from '../../domain/status';
+import { PRIORITY_TAG, sortByPriority } from '../../domain/status';
 import { useToast } from '../Toast';
 import { useAuth } from '../../state/AuthContext';
 import { HelpTip } from '../HelpTip';
@@ -164,7 +164,7 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
    * 顺序保持材料里的抽取次序（确认与否只改标签、不改位置）；
    * 人工新增的需求不是材料事实，所以不进这一块。
    */
-  const materialRequirements = requirements.filter((item) => item.source.material_id);
+  const materialRequirements = sortByPriority(requirements.filter((item) => item.source.material_id));
   const draftCount = materialRequirements.filter((item) => item.status !== 'confirmed').length;
 
   const retry = async (material: Material) => {

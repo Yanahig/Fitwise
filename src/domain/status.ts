@@ -60,6 +60,23 @@ export const PRIORITY_META: Record<Priority, { label: string; tone: 'high' | 'me
 /** 条目左侧的优先级小徽标：需求确认与判断条目共用同一套写法 */
 export const PRIORITY_TAG: Record<Priority, string> = { high: 'P0', medium: 'P1', low: 'P2' };
 
+/**
+ * 优先级排序权重：P0 → P1 → P2。
+ * 同一档内保持传入次序（稳定排序），所以"按优先级排"不会把同档的条目搅乱。
+ */
+export const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+
+export function sortByPriority<T extends { priority: Priority }>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort(
+      (a, b) =>
+        (PRIORITY_RANK[a.item.priority] ?? 1) - (PRIORITY_RANK[b.item.priority] ?? 1) ||
+        a.index - b.index,
+    )
+    .map(({ item }) => item);
+}
+
 export function countByStatus(statuses: MatchStatus[]): Record<MatchStatus, number> {
   const initial: Record<MatchStatus, number> = { full: 0, partial: 0, none: 0, unknown: 0 };
   for (const status of statuses) initial[status] += 1;

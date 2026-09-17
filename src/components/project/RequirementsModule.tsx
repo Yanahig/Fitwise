@@ -4,7 +4,7 @@ import type { ProjectTabProps } from '../../pages/ProjectWorkspacePage';
 import { api, pollJob } from '../../api/endpoints';
 import { summarizeOpenQuestion } from '../../domain/openQuestions';
 import { RISK_LEVEL_LABEL, risksForMatch } from '../../domain/risk';
-import { PRIORITY_TAG, countByStatus } from '../../domain/status';
+import { PRIORITY_META, PRIORITY_TAG, countByStatus, sortByPriority } from '../../domain/status';
 import { StatusBadge } from '../badges';
 import { MatchDetail } from './MatchDetail';
 import { SummaryBar } from './SummaryBar';
@@ -79,13 +79,12 @@ export function RequirementsModule({
         .join('，')
     : '确认后自动判断';
   /**
-   * 顺序就是需求自己的次序（后端按抽取顺序给）。
+   * 顺序 = 优先级（P0 → P1 → P2），同一档内保持抽出来的次序。
    *
-   * 不做「草稿在前、已确认在后」的分组：点「确认」之后那一条要留在原位 ——
-   * 一确认就跳到列表最下方，人会当场找不到自己刚点的那条，
-   * 尤其是「改一条、看一眼、再改下一条」的时候。
+   * 这样"最该先确认的"永远在最上面；确认动作本身不改优先级，
+   * 所以点完「确认」那一条仍然留在原位。
    */
-  const orderedRequirements = requirements;
+  const orderedRequirements = sortByPriority(requirements);
   /** 第一条还没确认的需求：结论条上的「待确认」落到它上面 */
   const firstDraftId = requirements.find((item) => item.status !== 'confirmed')?.id;
   const openJudgement = () => {
@@ -162,6 +161,23 @@ export function RequirementsModule({
     await api.deleteRequirement(id);
     await refresh();
     toast.push('已移除');
+  };
+
+  /**
+   * 人工改优先级：点卡片左侧的 P0/P1/P2 就能换档。
+   * 改完会立刻按新档位排序（卡片会移动到该去的位置），所以给一句提示，别让人以为点丢了。
+   */
+  const setPriority = async (id: number, priority: Priority) => {
+    try {
+      await api.updateRequirement(id, { priority });
+      await refresh();
+      toast.push(
+        `优先级已改为 ${PRIORITY_TAG[priority]}（${PRIORITY_META[priority].label}），列表已按新顺序排列`,
+        'success',
+      );
+    } catch (error) {
+      toast.push(error instanceof Error ? error.message : '改优先级失败', 'error');
+    }
   };
 
   const saveEdit = async () => {
@@ -263,9 +279,28 @@ export function RequirementsModule({
       >
         {/* 第一条草稿的锚点：结论条上的「待确认」点一下就落到这里 */}
         {anchorId ? <span id={anchorId} className="anchor-mark" aria-hidden="true" /> : null}
-        <span className={`req-brief__p req-brief__p--${item.priority}`}>
-          {PRIORITY_TAG[item.priority] ?? 'P1'}
-        </span>
+        {/* 优先级胶囊本身就是入口：点一下换档（P0/P1/P2），改完列表按新档位重排 */}
+        <details className="prio-menu">
+          <summary
+            className={`req-brief__p req-brief__p--${item.priority}`}
+            title={`${PRIORITY_META[item.priority]?.label ?? '中'}优先级 · 点一下改档`}
+          >
+            {PRIORITY_TAG[item.priority] ?? 'P1'}
+          </summary>
+          <div className="prio-menu__body">
+            {(['high', 'medium', 'low'] as Priority[]).map((level) => (
+              <button
+                key={level}
+                type="button"
+                className={`link-btn${level === item.priority ? ' is-current' : ''}`}
+                onClick={() => void setPriority(item.id, level)}
+              >
+                {PRIORITY_TAG[level]} {PRIORITY_META[level].label}优先级
+                {level === item.priority ? ' · 当前' : ''}
+              </button>
+            ))}
+          </div>
+        </details>
         <div className="req-brief__main">
           <span className="req-brief__title">
             {item.title}
@@ -469,7 +504,15 @@ export function RequirementsModule({
                 需求
                 <span className="fact-group__count">{requirements.length}</span>
               </h3>
-              <HelpTip text="客户材料里读出来的要求都在这一份清单里。带「草稿」标记的还没确认；点「确认」后这条进基线，并且立刻对着企业内部资料判断能不能做 —— 结论、风险与依据都留在这一张卡上。" />
+              <HelpTip
+                text={
+                  '客户材料里读出来的要求都在这一份清单里，按优先级从高到低排。' +
+                  'P0 = 客户写了硬性口径（必须 / 不得 / 不低于），或不做就交付不了；' +
+                  'P1 = 影响方案、报价或工期的关键条件；P2 = 加分项与可选范围。' +
+                  'AI 标的档位会在原文里核对，找不到硬性表述就降一档；点左侧的 P0/P1/P2 可以自己改，改完列表立刻按新顺序排。' +
+                  '带「草稿」标记的还没确认；点「确认」后这条进基线，并且立刻对着企业内部资料判断能不能做 —— 结论、风险与依据都留在这一张卡上。'
+                }
+              />
             </div>
             <div className="section-open__actions">
               <button

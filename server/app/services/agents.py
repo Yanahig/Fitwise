@@ -348,6 +348,60 @@ def _fallback_requirements(materials: list[Material], digest: str) -> dict:
     return {"requirements": requirements[:20], "open_questions": [], "project_facts": []}
 
 
+#: 「硬性口径」：标 high（P0）必须在原文里找得到这些写法之一
+HARD_PRIORITY_PATTERNS = (
+    "必须",
+    "须",
+    "不得",
+    "不允许",
+    "不接受",
+    "禁止",
+    "不低于",
+    "不少于",
+    "不得低于",
+    "应满足",
+    "应在",
+)
+
+#: 模型可能给出各种写法：先收敛到三档，认不出来的归 medium 并计数
+PRIORITY_ALIASES = {
+    "high": "high",
+    "p0": "high",
+    "高": "high",
+    "medium": "medium",
+    "p1": "medium",
+    "中": "medium",
+    "low": "low",
+    "p2": "low",
+    "低": "low",
+}
+
+
+def normalize_priority(value: Any) -> tuple[str, bool]:
+    """把模型给的优先级收敛到 high/medium/low。返回（档位, 是否认不出来）。"""
+    text = str(value or "").strip().lower()
+    if not text:
+        return "medium", False
+    mapped = PRIORITY_ALIASES.get(text)
+    if mapped:
+        return mapped, False
+    return "medium", True
+
+
+def guard_priority(priority: str, *texts: str) -> tuple[str, bool]:
+    """越界检查：标 high 必须有硬性表述兜底，找不到就降一档。
+
+    和判断层同一条原则 —— 结论不许比证据乐观。优先级没有证据支撑时，
+    宁可少标一个 P0，也不要让"人人 P0"把排序变成摆设。
+    """
+    if priority != "high":
+        return priority, False
+    blob = " ".join(text for text in texts if text)
+    if any(pattern in blob for pattern in HARD_PRIORITY_PATTERNS):
+        return priority, False
+    return "medium", True
+
+
 async def analyze_requirements(
     db: Session,
     *,
@@ -486,6 +540,8 @@ async def analyze_requirements(
     created: list[Requirement] = []
     skipped = 0
     unsourced = 0
+    priority_downgraded = 0
+    priority_unrecognized = 0
     for item in raw_requirements[:40]:
         material = _pick_source_material(parsed, str(item.get("source_material_name") or ""))
         if material is None:
@@ -523,12 +579,22 @@ async def analyze_requirements(
             skipped += 1
             continue
         existing.append((_norm_text(title), _norm_text(detail)))
+        # 优先级两道闸：先把模型给的值收敛到三档（认不出来的归中并计数），
+        # 再对 high 做越界检查 —— 原文里找不到硬性表述就降一档，别让"人人 P0"把排序变成摆设。
+        raw_priority, priority_unknown = normalize_priority(item.get("priority"))
+        # 只看这条需求自己的原文与描述，不看整页：整页里只要有一句「必须」，
+        # 同一页的需求就都能挂 P0 —— 那样闸门等于没有。
+        priority, priority_downgraded_here = guard_priority(raw_priority, title, detail, excerpt)
+        if priority_unknown:
+            priority_unrecognized += 1
+        if priority_downgraded_here:
+            priority_downgraded += 1
         requirement = Requirement(
             project_id=project.id,
             title=title,
             detail=detail,
             category=str(item.get("category") or "产品能力"),
-            priority=str(item.get("priority") or "medium"),
+            priority=priority,
             status="draft",
             source_material_id=material.id if material else None,
             source_material_name=material.filename if material else "",
@@ -566,7 +632,8 @@ async def analyze_requirements(
 
     logger.info(
         "需求抽取完成：项目 %s，%s 条（去重跳过 %s 条，无来源丢弃 %s 条，来源未定位 %s 条，"
-        "超限丢弃 %s 条，并发重复清理 %s 条，截断=%s，回退=%s，操作人=%s）",
+        "超限丢弃 %s 条，并发重复清理 %s 条，优先级降级 %s 条，优先级认不出 %s 条，"
+        "截断=%s，回退=%s，操作人=%s）",
         project.id,
         len(created),
         skipped,
@@ -574,6 +641,8 @@ async def analyze_requirements(
         unlocated_sources,
         over_limit,
         concurrent_duplicates,
+        priority_downgraded,
+        priority_unrecognized,
         truncated,
         fallback_used,
         actor,
@@ -584,6 +653,8 @@ async def analyze_requirements(
         "unlocated_sources": unlocated_sources,
         "dropped_over_limit": over_limit,
         "concurrent_duplicates_removed": concurrent_duplicates,
+        "priority_downgraded": priority_downgraded,
+        "priority_unrecognized": priority_unrecognized,
         "digest_truncated": int(bool(truncated)),
         "llm_fallback": int(fallback_used),
         "prompt_version": prompts.EXTRACT_PROMPT_VERSION,

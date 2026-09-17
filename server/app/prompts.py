@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 #: 整体版本。任何一步提示词有改动就递增（格式：日期.序号）。
-PROMPT_SET_VERSION = "2026-09-16.1"
+PROMPT_SET_VERSION = "2026-09-17.1"
 
 EXTRACT_PROMPT_VERSION = f"extract@{PROMPT_SET_VERSION}"
 JUDGE_PROMPT_VERSION = f"judge@{PROMPT_SET_VERSION}"
@@ -40,7 +40,7 @@ REQUIREMENT_SCHEMA = """{
     "title": "需求短标题（不超过 18 字）",
     "detail": "需求描述，保留客户口径",
     "category": "部署|产品能力|技术|合规|规模|服务",
-    "priority": "high|medium|low",
+    "priority": "high|medium|low（high=客户写了硬性口径或不做就交付不了；medium=影响方案/报价/工期的关键条件；low=加分项与可选范围）",
     "tags": ["能力标签，从需求中推断"],
     "constraints": ["客户提出的硬性约束"],
     "source_material_name": "来源文件名（必须与输入材料名一致）",
@@ -144,6 +144,11 @@ def extract_user_prompt(*, project_name: str, digest: str) -> str:
             "1. 只抽取客户明确提出的需求，同一件事只输出一条：即使材料里分处不同段落/不同页码去描述"
             "同一个要求（例如接口与并发写在两处），也要合并成一条，不要拆成两条近义需求；",
             "2. category 只能是 部署/产品能力/技术/合规/规模/服务 之一；",
+            "2.1 priority 的判断口径（按客户材料里的写法判，不要凭感觉标）："
+            "high = 客户写了硬性口径（必须 / 不得 / 不允许 / 不低于 / 不少于 / 应在…内）或带数字门槛的验收指标，"
+            "做不到就交付不了、投不了标；medium = 影响方案、报价或工期的关键条件，但不是「做不到就不行」；"
+            "low = 加分项、可选范围、体验类要求，不做也能交付。"
+            "标 high 时，source_excerpt 里必须能看到那句硬性表述；看不到就标 medium。",
             "3. source_material_name 必须与上面的材料名完全一致，source_page 必须是该材料中出现的页码；",
             "4. 材料中未明确、但会影响判断的信息，写入 open_questions。",
             "4.1 另外识别两样东西：customer_name（客户单位名称，例如「XX市档案馆」）与 project_name"

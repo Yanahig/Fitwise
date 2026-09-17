@@ -87,8 +87,6 @@ export function JudgementPage({
   const solution = project.solution;
   const gaps = matches.filter((item) => item.status === 'none');
   const unknown = matches.filter((item) => item.status === 'unknown');
-  const fullCount = matches.filter((item) => item.status === 'full').length;
-  const partialCount = matches.filter((item) => item.status === 'partial').length;
   const matchScore = Math.round(
     (((project.counts?.matches_full ?? 0) + (project.counts?.matches_partial ?? 0) * 0.5) /
       (project.counts?.matches || 1)) *
@@ -131,17 +129,13 @@ export function JudgementPage({
       }),
     );
 
-  /** 结论条上的三句概括：各自指向下面那一块，点一下就跳过去 —— 它同时是这一页的目录 */
+  /**
+   * 结论条上的两句概括：各自指向下面那一块，点一下就跳过去 —— 它同时是这一页的目录。
+   * 「需求判断」那一句不在这里：逐条结论跟着需求卡走（需求确认页），
+   * 这一页只留"还剩什么没定"（风险 / 下一步）。
+   */
   const nextActionText = actions.sales[0]?.text ?? actions.customer[0]?.text ?? '还没有下一步建议，先生成一份建议';
   const summaryLines: SummaryLine[] = [
-    {
-      label: '需求判断',
-      text: `${matches.length} 条需求里，${fullCount} 条完全支持、${partialCount} 条要先确认前提、${gaps.length} 条暂不支持${
-        unknown.length ? `、${unknown.length} 条待补依据` : ''
-      }`,
-      // 逐条结论在需求卡上：这一句是入口
-      href: requirementsHref,
-    },
     {
       label: '风险',
       text: `${risks.length} 条风险，其中 ${highRiskCount} 条高影响`,

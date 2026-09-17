@@ -4,7 +4,7 @@ import type { ProjectTabProps } from '../../pages/ProjectWorkspacePage';
 import { api, pollJob } from '../../api/endpoints';
 import { summarizeOpenQuestion } from '../../domain/openQuestions';
 import { RISK_LEVEL_LABEL, risksForMatch } from '../../domain/risk';
-import { PRIORITY_TAG } from '../../domain/status';
+import { PRIORITY_TAG, countByStatus } from '../../domain/status';
 import { StatusBadge } from '../badges';
 import { MatchDetail } from './MatchDetail';
 import { SummaryBar } from './SummaryBar';
@@ -63,7 +63,22 @@ export function RequirementsModule({
   /** 只有一份材料时不需要在每条需求上重复文件名，页码才是要找的东西 */
   const showSourceDocName = materials.length > 1;
   const highPriority = requirements.filter((item) => item.priority === 'high').length;
-  const gapCount = matches.filter((item) => item.status === 'none').length;
+  /**
+   * 能力判断的分档分布：这一句从售前建议页搬过来 ——
+   * 结论本来就长在这一页的卡片上，统计也该跟着结论走。
+   * 只列有的档，顺序是「越靠前越需要人管」：待补依据 → 暂不支持 → 部分支持 → 完全支持。
+   */
+  const statusCounts = countByStatus(matches.map((item) => item.status));
+  const statusText = matches.length
+    ? [
+        statusCounts.unknown ? `待补依据 ${statusCounts.unknown}` : '',
+        statusCounts.none ? `暂不支持 ${statusCounts.none}` : '',
+        statusCounts.partial ? `部分支持 ${statusCounts.partial}` : '',
+        statusCounts.full ? `完全支持 ${statusCounts.full}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '确认后自动判断';
   /**
    * 顺序就是需求自己的次序（后端按抽取顺序给）。
    *
@@ -405,9 +420,7 @@ export function RequirementsModule({
           },
           {
             label: '能力判断',
-            text: matches.length
-              ? `${matches.length} 条已出结论${gapCount ? `，其中 ${gapCount} 条暂不支持` : ''}`
-              : '确认后自动判断',
+            text: statusText,
             target: 'requirements-list',
           },
           {

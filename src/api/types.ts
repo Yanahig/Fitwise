@@ -260,6 +260,21 @@ export interface MatchBasis {
   }[];
 }
 
+/** 一条对客问题：affects 说它不确认会影响什么，covers 说它覆盖了哪几条需求的待确认项 */
+export interface AskCustomerItem {
+  question: string;
+  affects?: 'judge' | 'promise' | '';
+  covers?: number[];
+}
+
+/** 一条要同步给销售 / 商务的信息（不是待办）：说给谁听、为什么必须同步 */
+export interface SyncSalesItem {
+  info: string;
+  to: string;
+  why?: string;
+  urgency: Priority;
+}
+
 export interface Solution {
   id: number;
   project_id: number;
@@ -275,8 +290,10 @@ export interface Solution {
     status_counts?: Record<string, number>;
   }[];
   reference_cases: { case_id: number; name?: string; reason: string; hit_count?: number }[];
-  ask_customer: string[];
+  /** 老数据是字符串数组；新数据是带 affects / covers 的对象 */
+  ask_customer: (string | AskCustomerItem)[];
   ask_internal: { question: string; owner: string }[];
+  sync_sales?: SyncSalesItem[];
   risks: {
     level: 'high' | 'medium' | 'low';
     title: string;

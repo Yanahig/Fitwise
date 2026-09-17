@@ -291,6 +291,8 @@ def solution_out(solution: Solution, db: Session | None = None) -> dict:
         "reference_cases": solution.reference_cases or [],
         "ask_customer": solution.ask_customer or [],
         "ask_internal": solution.ask_internal or [],
+        # 要同步给销售 / 商务的信息（承诺边界、报价与周期口径），不是待办
+        "sync_sales": solution.sync_sales or [],
         # 风险与行动带上它们依据的判断与证据（存 id、读时解析）
         "risks": _with_basis(solution.risks or [], db),
         "next_actions": _with_basis(solution.next_actions or [], db),

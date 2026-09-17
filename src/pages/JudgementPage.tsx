@@ -1,4 +1,5 @@
 import type { Match, Priority, Project } from '../api/types';
+import { useEffect, useState } from 'react';
 import { buildActionGroups, dueLabel, promiseBoundaries } from '../domain/actions';
 import type { ActionRow } from '../domain/actions';
 import { RISK_LEVEL_LABEL, RISK_LEVELS } from '../domain/risk';
@@ -11,6 +12,32 @@ import { IconAlert, IconRoute, IconTarget, IconUsers } from '../components/icons
 
 /** 风险分区顺序：高 → 中 → 低 */
 const RISK_ORDER: Record<RiskLevel, number> = { high: 0, medium: 1, low: 2 };
+
+/**
+ * 「下一步行动」的完成状态记在本机，按项目分开存。
+ *
+ * 这一层只回答"这件事办了没有"，所以不落库、不引入任务跟踪 ——
+ * 换台机器、换个人看，清单还是 AI 排的那一份（docs/information-hierarchy.md 第四十四轮）。
+ */
+const doneStorageKey = (projectId: number) => `fitwise.done-actions.${projectId}`;
+
+function readDoneActions(projectId: number): string[] {
+  try {
+    const raw = window.localStorage.getItem(doneStorageKey(projectId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDoneActions(projectId: number, items: string[]): void {
+  try {
+    window.localStorage.setItem(doneStorageKey(projectId), JSON.stringify(items));
+  } catch {
+    // 隐私模式等写不进去：本次会话里照样置灰沉底，只是刷新后不留
+  }
+}
 
 /**
  * 售前建议：回答「这个项目现在什么结论、还剩什么事没定」。
@@ -101,11 +128,28 @@ export function JudgementPage({
     .sort((a, b) => RISK_ORDER[a.level] - RISK_ORDER[b.level]);
   const highRiskCount = risks.filter((item) => item.level === 'high').length;
 
-  /* ---------------- 要问谁：还没定的事按对象分组 ---------------- */
+  /* ---------------- 要问谁 + 下一步行动 ---------------- */
 
   const actions = buildActionGroups(project, matches);
   const boundaries = promiseBoundaries(matches);
   const priorityLabel: Record<Priority, string> = { high: '优先', medium: '常规', low: '可选' };
+
+  /**
+   * 做完的下一步：置灰、沉到最后，结论条上的「下一步」自动落到还没做完的第一条。
+   * 状态按项目存在本机（页面挂在 project.id 上，换项目会重新挂载再读一份）。
+   */
+  const [doneActions, setDoneActions] = useState<string[]>(() => readDoneActions(project.id));
+  useEffect(() => writeDoneActions(project.id, doneActions), [project.id, doneActions]);
+  const doneSet = new Set(doneActions);
+  const toggleDone = (text: string) =>
+    setDoneActions((prev) =>
+      prev.includes(text) ? prev.filter((item) => item !== text) : [...prev, text],
+    );
+  const orderedNextActions = [
+    ...actions.nextActions.filter((row) => !doneSet.has(row.text)),
+    ...actions.nextActions.filter((row) => doneSet.has(row.text)),
+  ];
+  const doneActionCount = actions.nextActions.filter((row) => doneSet.has(row.text)).length;
 
   const openRequirement = (requirementId: number) =>
     window.dispatchEvent(
@@ -121,7 +165,8 @@ export function JudgementPage({
    * 所以后者的文本要短（先取动作的第一个短句），责任人与日期跟在后面，
    * 这样 30 个字的概括行里也放得下，点一下直接落到那一条动作上。
    */
-  const nextAction = actions.sales[0];
+  /** 只报还没做完的那一条：全做完了就说"做完了"，不再指一条已经划掉的 */
+  const nextAction = actions.nextActions.find((row) => !doneSet.has(row.text));
   /** 只留动作的第一个短句，太长的再截一刀 —— 概括行只有 30 个字，责任人与日期得放得下 */
   const shortActionText = (text: string, limit = 12) => {
     const head = text.split(/[：:，,；;]/)[0].trim();
@@ -133,12 +178,16 @@ export function JudgementPage({
     : '';
   const nextStepText = nextAction
     ? `${shortActionText(nextAction.text)}${nextActionMeta ? `（${nextActionMeta}）` : ''}`
-    : actions.customer.length
-      ? `先问客户：${shortActionText(actions.customer[0].text)}`
-      : '还没有下一步建议，先生成一份建议';
-  /** 待澄清统计跟着「要问谁」走：能力匹配页只在清单底下留一行入口，这里才是它的家 */
-  const openQuestions = project.open_questions ?? [];
-  const customerQuestionCount = openQuestions.filter((item) => (item.owner || '客户') !== '内部').length;
+    : actions.nextActions.length
+      ? '下一步的事都做完了'
+      : actions.customer.length
+        ? `先问客户：${shortActionText(actions.customer[0].text)}`
+        : '还没有下一步建议，先生成一份建议';
+  /**
+   * 待澄清统计只数"还没定的事"：要问客户 + 要问内部。
+   * 要同步销售是给销售的信息、下一步行动是已经定了要干什么，都不该混进这个数字。
+   */
+  const questionCount = actions.customer.length + actions.internal.length;
   const summaryLines: SummaryLine[] = [
     {
       label: '风险',
@@ -147,10 +196,8 @@ export function JudgementPage({
     },
     {
       label: '待澄清',
-      text: openQuestions.length
-        ? `${openQuestions.length} 处（问客户 ${customerQuestionCount} · 内部 ${
-            openQuestions.length - customerQuestionCount
-          }）`
+      text: questionCount
+        ? `${questionCount} 处（问客户 ${actions.customer.length} · 内部 ${actions.internal.length}）`
         : '暂时没有待澄清问题',
       target: 'judgement-actions',
     },
@@ -158,12 +205,12 @@ export function JudgementPage({
       label: '下一步',
       text: nextStepText,
       // 有具体动作就落到那一条上；没有动作时退回整个「要问谁」分区
-      target: nextAction ? 'next-action' : 'judgement-actions',
+      target: nextAction ? 'next-action' : 'advice-next-actions',
     },
   ];
 
-  const renderRow = (row: ActionRow, anchorId?: string) => (
-    <li key={row.text} id={anchorId}>
+  const renderRow = (row: ActionRow, options: { anchorId?: string; done?: boolean } = {}) => (
+    <li key={row.text} id={options.anchorId} className={options.done ? 'action-row--done' : undefined}>
       <span className="action-group__tag">{row.tag}</span>
       <span className="action-group__text">
         {row.text}
@@ -186,10 +233,24 @@ export function JudgementPage({
             {row.priority ? ` · ${priorityLabel[row.priority as Priority] ?? ''}` : ''}
           </em>
         ) : null}
+        {/* 要同步销售的那条：为什么必须同步 —— 不同步会出什么事 */}
+        {row.note ? <span className="action-group__note">{row.note}</span> : null}
         {row.basis?.length ? (
           <BasisList basis={row.basis} materials={project.materials ?? []} />
         ) : null}
       </span>
+      {/* 只有「下一步行动」这一列有完成按钮：问题池那些条没有"办完了"这回事 */}
+      {options.done === undefined ? null : (
+        <button
+          type="button"
+          className={`action-row__done${options.done ? ' action-row__done--on' : ''}`}
+          aria-pressed={options.done}
+          title={options.done ? '点一下恢复为未完成' : '点一下标为已完成：这条会置灰并沉到最后'}
+          onClick={() => toggleDone(row.text)}
+        >
+          {options.done ? '已完成 ✓' : '已完成'}
+        </button>
+      )}
     </li>
   );
 
@@ -301,7 +362,7 @@ export function JudgementPage({
               要问谁
               <span className="fact-group__count">{actions.total}</span>
             </h3>
-            <HelpTip text="还没定的事都在这三组里：要问客户、要问内部（同事 / 研发）、要同步销售。标「影响判断」的不确认，能力结论就不成立；标「影响承诺」的只影响交付口径。" />
+            <HelpTip text="还没定的事都在这三组里：要问客户、要问内部（同事 / 研发）、要同步销售（给销售 / 商务的信息，不是待办）。标「影响判断」的不确认，能力结论就不成立；标「影响承诺」的只影响交付口径。" />
           </div>
         </header>
 
@@ -349,8 +410,7 @@ export function JudgementPage({
               </span>
             </div>
             <ul className="action-group__list">
-              {/* 第一条挂个锚点：结论条上的「下一步」直接落到它身上（列表已按优先级 + 截止日期排） */}
-              {actions.sales.map((row, index) => renderRow(row, index === 0 ? 'next-action' : undefined))}
+              {actions.sales.map((row) => renderRow(row))}
               {actions.sales.length === 0 ? <li className="action-group__rest">暂无</li> : null}
             </ul>
             {/* 没有承诺边界就不占位：能力缺口与待补依据都没有时，这一块没有可说的内容 */}
@@ -364,6 +424,40 @@ export function JudgementPage({
                 </ul>
               </div>
             ) : null}
+          </section>
+        </div>
+      </section>
+
+      {/* 下一步行动：执行清单 —— 先办哪一件、谁办、什么时候（不再混进"要同步销售"） */}
+      <section className="section-open" id="advice-next-actions">
+        <header className="section-open__head">
+          <div className="section-open__titleline">
+            <h3>
+              <IconRoute width={16} height={16} />
+              下一步行动
+              <span className="fact-group__count">{actions.nextActions.length}</span>
+            </h3>
+            {doneActionCount ? (
+              <span className="hint hint--inline">已完成 {doneActionCount}</span>
+            ) : null}
+            <HelpTip text="从判断与问题池里排出来的执行清单：先办哪一件、谁办、什么时候，按优先级与截止时间排。办完的点「已完成」，这条会置灰并沉到最后；完成状态记在本机，刷新不丢。每条都能点回它依据的那条需求。" />
+          </div>
+        </header>
+
+        <div className="action-groups">
+          <section className="action-group">
+            <ul className="action-group__list action-group__list--plain">
+              {/* 第一条挂个锚点：结论条上的「下一步」直接落到它身上（列表已按优先级 + 截止日期排） */}
+              {orderedNextActions.map((row, index) =>
+                renderRow(row, {
+                  anchorId: index === 0 && !doneSet.has(row.text) ? 'next-action' : undefined,
+                  done: doneSet.has(row.text),
+                }),
+              )}
+              {orderedNextActions.length === 0 ? (
+                <li className="action-group__rest">还没排下一步 —— 生成一份建议就有</li>
+              ) : null}
+            </ul>
           </section>
         </div>
       </section>

@@ -172,6 +172,13 @@
   min-width: 0;
 }
 
+/* 一行里的两个动作（打开 / 删除）：并排紧挨着，占 .list-row 里最后一列 */
+.list-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* 新建分析：字段行沿用项目列表的行节奏 —— 左标签、右输入/操作，一行一件事 */
 .list-row--form {
   grid-template-columns: minmax(0, 160px) minmax(0, 1fr) auto;
@@ -3224,6 +3231,62 @@ details[open] > summary .group-chevron {
   font-style: normal;
 }
 
+/* 要同步销售的那条：为什么必须同步 —— 比责任人再弱一档，读的时候不抢主线 */
+.action-group__note {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-muted-foreground);
+  font-size: var(--text-xs);
+}
+
+/* 「下一步行动」那张卡没有分组标题（章节标题已经说了），列表就不需要上边框 */
+.action-group__list--plain {
+  padding-top: 0;
+  border-top: none;
+  border-bottom: none;
+}
+
+/* 「下一步行动」的行比问题池多一列：右边的「已完成」按钮 */
+.action-group__list--plain li {
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto;
+}
+
+/* 做完的：整条压暗（按钮保持原样，方便撤销），标题那行加上删除线 */
+.action-row--done .action-group__tag,
+.action-row--done .action-group__text {
+  opacity: 0.55;
+}
+
+.action-row--done .action-group__text {
+  text-decoration: line-through;
+  text-decoration-color: var(--color-border-strong);
+}
+
+.action-row__done {
+  justify-self: end;
+  align-self: start;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.action-row__done:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-2);
+  color: var(--color-foreground);
+}
+
+.action-row__done--on {
+  border-color: var(--status-full-border);
+  background: var(--status-full-bg);
+  color: var(--status-full-fg);
+}
+
 .action-group__rest {
   color: var(--color-tertiary-foreground);
   font-size: var(--text-xs);
@@ -4873,9 +4936,40 @@ details[open] > summary .group-chevron {
     justify-content: flex-start;
   }
 
+  /**
+   * 窄屏：按钮提到行的右上角，别压在指标下面。
+   * 一列排下去时一行有 180px 高，"打开 / 删除"会掉到首屏之外（实测 319×570 的面板里
+   * y=578，正好差 8px 看不见）；改成"标题在左、按钮在右上、指标另起一行"，不滚也能点到。
+   */
   .list-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-3);
+    align-items: start;
+  }
+
+  .list-row__actions {
+    grid-row: 1;
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+
+  .list-row__main {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .list-row__metrics {
+    grid-column: 1 / -1;
+    gap: var(--space-4);
+  }
+
+  /* 窄屏：一行放不下「小标题 + 正文 + 已完成」，按钮另起一行 */
+  .action-group__list--plain li {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
+  }
+
+  .action-row__done {
+    justify-self: start;
   }
 
   .list-row__metrics {

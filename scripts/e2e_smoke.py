@@ -239,21 +239,37 @@ def _run() -> int:
     print(
         f"10. 行动建议（只在方案里，不再落成待办）："
         f"要问客户 {len(solution['ask_customer'])} 条、要问内部 {len(solution['ask_internal'])} 条、"
-        f"动作 {len(solution['next_actions'])} 条"
+        f"要同步销售 {len(solution['sync_sales'])} 条、动作 {len(solution['next_actions'])} 条"
     )
     for item in solution["ask_customer"][:2]:
-        print(f"   - 要问客户：{item[:50]}")
+        text = item["question"] if isinstance(item, dict) else str(item)
+        print(f"   - 要问客户：{text[:50]}")
 
     # ③ 建议层：三组都要有东西，而且对客组不能混进内部问题
     check(
         "三组行动都非空",
-        all([solution["ask_customer"], solution["ask_internal"], solution["next_actions"]]),
-        f"客户 {len(solution['ask_customer'])} / 内部 {len(solution['ask_internal'])} / 动作 {len(solution['next_actions'])}",
+        all([solution["ask_customer"], solution["ask_internal"], solution["sync_sales"]]),
+        f"客户 {len(solution['ask_customer'])} / 内部 {len(solution['ask_internal'])} / "
+        f"销售 {len(solution['sync_sales'])}",
     )
-    ask_customer_norm = {norm(item) for item in solution["ask_customer"]}
+    merged = [item for item in solution["ask_customer"] if isinstance(item, dict)]
+    check(
+        "对客清单是合并过的（每条带 covers）",
+        bool(merged) and len(merged) == len(solution["ask_customer"]) and all("covers" in item for item in merged),
+        f"{len(merged)}/{len(solution['ask_customer'])} 条",
+    )
+    ask_customer_norm = {
+        norm(item["question"] if isinstance(item, dict) else str(item)) for item in solution["ask_customer"]
+    }
     ask_internal_norm = {norm(item.get("question", "")) for item in solution["ask_internal"]}
     overlap = ask_customer_norm & ask_internal_norm
     check("对客与内部问题不重复", not overlap, f"重复 {len(overlap)} 条" if overlap else "")
+    with_to = [item for item in solution["sync_sales"] if item.get("to")]
+    check(
+        "要同步销售的每条都写了同步给谁",
+        len(with_to) == len(solution["sync_sales"]),
+        f"{len(with_to)}/{len(solution['sync_sales'])} 条",
+    )
 
     customers = client.get("/api/customers").json()
     board = client.get("/api/dashboard").json()

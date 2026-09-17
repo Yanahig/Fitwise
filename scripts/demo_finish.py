@@ -68,7 +68,7 @@ def main() -> int:
     print(
         f"售前建议 v{solution['version']}：{len(solution['steps'])} 步 / "
         f"{len(solution['risks'])} 条风险 / 问客户 {len(solution['ask_customer'])} 项 / "
-        f"问内部 {len(solution['ask_internal'])} 项"
+        f"问内部 {len(solution['ask_internal'])} 项 / 同步销售 {len(solution.get('sync_sales') or [])} 项"
     )
     print("完成：项目已推进到「售前建议」状态")
     return 0

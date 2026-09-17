@@ -153,9 +153,13 @@ def main() -> int:
     print(f"    风险 {len(risks)} 条：{by_level}｜能回指需求 {with_ids}/{len(risks)}")
     print(f"    要问客户 {len(solution.get('ask_customer') or [])} 条｜"
           f"要问内部 {len(solution.get('ask_internal') or [])} 条｜"
+          f"要同步销售 {len(solution.get('sync_sales') or [])} 条｜"
           f"动作 {len(solution.get('next_actions') or [])} 条")
     for item in (solution.get("ask_customer") or [])[:3]:
-        print(f"    - 要问客户：{str(item)[:52]}")
+        text = item.get("question", "") if isinstance(item, dict) else str(item)
+        print(f"    - 要问客户：{text[:52]}")
+    for item in (solution.get("sync_sales") or [])[:2]:
+        print(f"    - 要同步销售（{item.get('to', '')}）：{str(item.get('info', ''))[:48]}")
 
     project = client.get(f"/api/projects/{pid}").json()
     print(f"[5] 终态：{project['counts']}")

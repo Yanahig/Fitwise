@@ -244,6 +244,8 @@ class Solution(Base):
     reference_cases: Mapped[list] = mapped_column(JSON, default=list)
     ask_customer: Mapped[list] = mapped_column(JSON, default=list)
     ask_internal: Mapped[list] = mapped_column(JSON, default=list)
+    #: 要同步给销售 / 商务的信息（承诺边界、报价口径、交付与竞争风险），不是待办
+    sync_sales: Mapped[list] = mapped_column(JSON, default=list)
     risks: Mapped[list] = mapped_column(JSON, default=list)
     next_actions: Mapped[list] = mapped_column(JSON, default=list)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

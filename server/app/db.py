@@ -64,6 +64,9 @@ def _add_missing_columns() -> None:
             connection.execute(text("ALTER TABLE match_results ADD COLUMN self_check JSON"))
         if missing("requirements", "edited"):
             connection.execute(text("ALTER TABLE requirements ADD COLUMN edited BOOLEAN DEFAULT 0"))
+        # 售前建议的「要同步销售」：从 next_actions 借来的通用待办改成本字段（信息，不是待办）
+        if missing("solutions", "sync_sales"):
+            connection.execute(text("ALTER TABLE solutions ADD COLUMN sync_sales JSON"))
         # 已下线功能的旧表：行动项（"下一步"只在售前建议页以三组清单呈现）、
         # 对客承诺登记、客户联系人（决策链 AI 既不读也不写）—— 连同数据一起清掉
         for table in ("action_items", "commitments", "contacts"):

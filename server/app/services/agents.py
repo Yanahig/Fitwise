@@ -1288,6 +1288,164 @@ def _validate_solution_steps(steps: list, matches: list[MatchResult]) -> list[di
     return verified
 
 
+def _question_pool_lines(project: Project, matches: list[MatchResult]) -> str:
+    """把「已有的待确认问题」拼成给方案步骤看的一段文本。
+
+    来源是需求阶段抽出来的问题（自带 owner）与每条判断给出的前提。
+    必须给全量：模型看不到池子，就只能照着匹配结果再问一遍，同一件事会被问三遍
+    （需求阶段一次、判断一次、方案再一次），前端只按完全相同的文本去重是合并不掉的。
+    """
+    lines: list[str] = []
+    for item in project.open_questions or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("question") or "").strip()
+        if not text:
+            continue
+        lines.append(f"- [{str(item.get('owner') or '客户')}] {text}")
+    for match in matches:
+        title = match.requirement.title if match.requirement else ""
+        for item in match.confirmations or []:
+            text = str(item or "").strip()
+            if text:
+                lines.append(f"- [判断前提·{title}] {text}")
+    return "\n".join(lines)
+
+
+def _normalize_ask_customer(items: list) -> list[dict]:
+    """对客问题统一成 {question, affects, covers}。
+
+    老数据是纯字符串数组，新数据是对象：读取时都要能用，所以在这里归一。
+    affects 只认 judge / promise 两档（不确认会不会改变能力结论）；covers 这里还是模型写的
+    「匹配结果编号」，由 _attach_ask_customer_covers 校验成需求 id 后才落库。
+    """
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for item in items:
+        if isinstance(item, dict):
+            question = str(item.get("question") or "").strip()
+            affects = str(item.get("affects") or "").strip().lower()
+            covers = [int(value) for value in item.get("covers") or [] if str(value).strip().isdigit()]
+        else:
+            question, affects, covers = str(item or "").strip(), "", []
+        if not question or question in seen:
+            continue
+        seen.add(question)
+        rows.append(
+            {
+                "question": question,
+                "affects": affects if affects in {"judge", "promise"} else "",
+                "covers": covers,
+            }
+        )
+    return rows
+
+
+def _normalize_ask_internal(items: list) -> list[dict]:
+    """内部问题统一成 {question, owner}，顺手按问题文本去重。"""
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for item in items:
+        if isinstance(item, dict):
+            question = str(item.get("question") or "").strip()
+            owner = str(item.get("owner") or "").strip()
+        else:
+            question, owner = str(item or "").strip(), ""
+        if not question or question in seen:
+            continue
+        seen.add(question)
+        rows.append({"question": question, "owner": owner})
+    return rows
+
+
+def _attach_ask_customer_covers(items: list, matches: list[MatchResult]) -> list[dict]:
+    """把对客问题的 covers 从「匹配结果编号」映射成需求 id，再交给前端去重。
+
+    模型写的 covers 是上面匹配结果列表里的编号（1..N）；前端手上只有库里的需求 id，
+    两边量纲不一致就直接比对不上 —— 于是"模型已经合并过、前端又补一遍"的重复全都回来了。
+    与 risks / next_actions 一样：模型提议编号，后端校验成 id。
+    """
+    by_index = {index: match.requirement_id for index, match in enumerate(matches, start=1)}
+    rows = _normalize_ask_customer(items)
+    for row in rows:
+        ids: list[int] = []
+        for ref in row.get("covers") or []:
+            requirement_id = by_index.get(int(ref))
+            if requirement_id and requirement_id not in ids:
+                ids.append(requirement_id)
+        row["covers"] = ids
+    return rows
+
+
+def _derive_sync_sales(matches: list[MatchResult]) -> list[dict]:
+    """规则兜底：模型没给「要同步销售」的信息时，从判断结果直接推。
+
+    只做站得住的推导 —— 暂不支持 → 别正面承诺；待补依据 → 先别表态；
+    部分支持且带前置条件 → 对外说结论时要带上这个前提。
+    同步的是"信息"不是待办，所以每条都写清不同步会出什么事（why）。
+    """
+    rows: list[dict] = []
+    seen: set[str] = set()
+
+    def push(info: str, to: str, why: str, urgency: str) -> None:
+        key = info.strip()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        rows.append({"info": key, "to": to, "why": why, "urgency": urgency})
+
+    for match in matches:
+        title = match.requirement.title if match.requirement else "这条需求"
+        if match.status == "none":
+            push(
+                f"「{title}」目前没有能力依据，对客户先按暂不支持讲，不要正面承诺。",
+                "销售",
+                "销售先许了口，方案与交付兜不住时只能由公司背。",
+                "high",
+            )
+        elif match.status == "unknown":
+            push(
+                f"「{title}」的证据还没补齐，对客户先按待补依据讲，等内部确认口径后再表态。",
+                "销售",
+                "结论没定就表态，后面要么改口、要么硬做。",
+                "medium",
+            )
+        elif match.status == "partial" and match.condition:
+            push(
+                f"「{title}」的结论带前置条件：{match.condition}",
+                "售前负责人",
+                "不带上这个前提对外说，会被当成无条件承诺。",
+                "medium",
+            )
+    return rows
+
+
+def _normalize_sync_sales(items: list, matches: list[MatchResult]) -> list[dict]:
+    """要同步销售的信息统一成 {info, to, why, urgency}；模型没给就按规则推。"""
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for item in items:
+        if isinstance(item, dict):
+            info = str(item.get("info") or item.get("text") or "").strip()
+            to = str(item.get("to") or item.get("owner") or "销售").strip()
+            why = str(item.get("why") or "").strip()
+            urgency = str(item.get("urgency") or item.get("priority") or "").strip().lower()
+        else:
+            info, to, why, urgency = str(item or "").strip(), "销售", "", ""
+        if not info or info in seen:
+            continue
+        seen.add(info)
+        rows.append(
+            {
+                "info": info,
+                "to": to or "销售",
+                "why": why,
+                "urgency": urgency if urgency in {"high", "medium", "low"} else "medium",
+            }
+        )
+    return rows or _derive_sync_sales(matches)
+
+
 def _fallback_solution(project: Project, matches: list[MatchResult], problem: str) -> dict:
     full = [m for m in matches if m.status == "full"]
     partial = [m for m in matches if m.status == "partial"]
@@ -1373,14 +1531,26 @@ def _fallback_solution(project: Project, matches: list[MatchResult], problem: st
         else "整体方案可行，可进入方案编制与报价阶段。"
     )
 
+    ask_customer: list[dict] = []
+    for index, match in enumerate(matches, start=1):
+        for item in match.confirmations or []:
+            if not item:
+                continue
+            ask_customer.append(
+                {
+                    "question": item,
+                    "affects": "judge" if match.status in {"none", "unknown"} else "promise",
+                    "covers": [index],
+                }
+            )
+
     return {
         "summary": summary,
         "steps": steps,
         "capability_plan": [],
-        "ask_customer": [
-            item for match in matches for item in (match.confirmations or []) if item
-        ][:6],
+        "ask_customer": ask_customer[:6],
         "ask_internal": [],
+        "sync_sales": _derive_sync_sales(matches),
         "risks": risks,
         "next_actions": [
             {
@@ -1425,6 +1595,7 @@ async def compose_solution(
         project_name=project.name,
         problem=problem,
         match_lines=match_lines,
+        question_pool=_question_pool_lines(project, matches),
     )
     meta: dict[str, Any] = {}
     payload = await chat_json(
@@ -1457,8 +1628,11 @@ async def compose_solution(
         capability_plan=_capability_plan_from_matches(db, matches)
         or _known_products_only(db, payload.get("capability_plan") or []),
         reference_cases=_reference_cases_from_matches(db, matches),
-        ask_customer=payload.get("ask_customer") or [],
-        ask_internal=payload.get("ask_internal") or [],
+        # covers 从"匹配结果编号"换成需求 id，前端才能按编号跟判断前提去重
+        ask_customer=_attach_ask_customer_covers(payload.get("ask_customer") or [], matches),
+        ask_internal=_normalize_ask_internal(payload.get("ask_internal") or []),
+        # 要同步销售的是"信息"，模型没给就按判断结果推：暂不支持 → 别正面承诺；待补依据 → 先别表态
+        sync_sales=_normalize_sync_sales(payload.get("sync_sales") or [], matches),
         # 风险与行动也要能回指依据：模型给需求标题，这里校验成库里的需求 id
         risks=_ensure_risks_for_judgements(
             _attach_requirement_ids(payload.get("risks") or [], matches), matches

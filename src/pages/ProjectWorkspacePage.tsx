@@ -237,6 +237,7 @@ export function ProjectWorkspacePage({
           <div className="workspace-grid__main">
             {/* 逐条结论在能力匹配页；这一页负责风险与「要问谁」 */}
             <JudgementPage
+              key={project.id}
               project={project}
               matches={matches}
               busy={busy}

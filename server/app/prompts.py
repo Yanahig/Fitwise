@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 #: 整体版本。任何一步提示词有改动就递增（格式：日期.序号）。
-PROMPT_SET_VERSION = "2026-09-17.1"
+PROMPT_SET_VERSION = "2026-09-17.2"
 
 EXTRACT_PROMPT_VERSION = f"extract@{PROMPT_SET_VERSION}"
 JUDGE_PROMPT_VERSION = f"judge@{PROMPT_SET_VERSION}"
@@ -80,8 +80,9 @@ SOLUTION_SCHEMA = """{
   "summary": "整体判断（2-3 句）",
   "steps": [{ "title": "", "detail": "", "based_on": ["依据的产品或案例"], "status": "full|partial|none|unknown" }],
   "capability_plan": [{ "product": "", "role": "", "readiness": "full|partial|none|unknown" }],
-  "ask_customer": ["需要向客户确认的问题"],
-  "ask_internal": [{ "question": "需要内部确认的问题", "owner": "平台研发|产品团队|交付团队|售前负责人" }],
+  "ask_customer": [{ "question": "合并去重后的对客问题（一句）", "affects": "judge|promise", "covers": [1, 3] }],
+  "ask_internal": [{ "question": "需要内部确认的问题（合并去重）", "owner": "平台研发|产品团队|交付团队|售前负责人" }],
+  "sync_sales": [{ "info": "要同步给销售 / 商务的一句话信息", "to": "销售|商务|售前负责人|项目负责人", "why": "为什么必须同步：不同步会出什么问题", "urgency": "high|medium|low" }],
   "risks": [{ "level": "high|medium|low", "title": "", "detail": "", "mitigation": "", "based_on": [1, 3] }],
   "next_actions": [{ "action": "", "owner": "", "due": "", "priority": "high|medium|low", "based_on": [1] }]
 }"""
@@ -113,7 +114,8 @@ JUDGE_SYSTEM = (
 )
 
 SOLUTION_SYSTEM = (
-    "你是企业售前的方案助手。请基于已完成的「需求 × 企业能力匹配结果」给出解决路径与下一步行动。"
+    "你是企业售前的方案助手。请基于已完成的「需求 × 企业能力匹配结果」给出解决路径，"
+    "并把还没定的事分成三份清单：要问客户的问题、要内部拉通的问题、要同步给销售的信息，另加下一步行动。"
     "不得承诺知识库中没有的能力；风险与待确认项必须明确列出；输出面向售前的可执行建议。"
     "表达用售前听得懂的口语化中文，不要使用技术或工程术语（例如「基线」「落库」「模型」「检索」）。"
 )
@@ -199,8 +201,13 @@ def judge_user_prompt(
     )
 
 
-def solution_user_prompt(*, project_name: str, problem: str, match_lines: str) -> str:
-    """匹配结果清单 → 售前建议的 user 提示词。"""
+def solution_user_prompt(*, project_name: str, problem: str, match_lines: str, question_pool: str) -> str:
+    """匹配结果清单 + 已有的待确认问题 → 售前建议的 user 提示词。
+
+    问题池必须一起给模型：对客的一堆问题原本由「需求阶段问题 + 判断前提 + 方案阶段问题」
+    三处各写一遍，前端只按完全相同文本去重，同一件事会重复出现（见 docs/information-hierarchy.md）。
+    让模型在能看到全量问题的地方做合并，前端只按需求编号兜底去重。
+    """
     return "\n".join(
         [
             f"【项目】{project_name}",
@@ -208,12 +215,25 @@ def solution_user_prompt(*, project_name: str, problem: str, match_lines: str) -
             "【匹配结果】",
             match_lines or "（尚未完成能力匹配）",
             "",
+            "【已有的待确认问题】",
+            question_pool or "（暂无）",
+            "",
             "【要求】",
             "1. 解决路径按“可直接使用的能力 → 需确认的前置条件 → 需要补信息或定制的部分”排序；",
-            "2. ask_customer 是问客户的问题，ask_internal 是要内部拉通的问题（含责任方）；",
-            "3. 风险分为 high / medium / low，每条都要有应对建议；",
-            "4. next_actions 要具体、可指派、带时限；",
-            "5. risks 与 next_actions 每条都必须写 based_on：填上面匹配结果里的**需求编号**（整数数组，"
+            "2. ask_customer 是**合并去重后**的对客问题清单：【已有的待确认问题】里凡是要问客户的，"
+            "都必须在这里出现（可以改写成对客口径），同一件事只留一条；"
+            "affects 填 judge（不确认会改变能力结论）或 promise（只影响承诺与交付口径）；"
+            "covers 填这条问题覆盖了【匹配结果】里的哪几个需求编号（整数数组，编号必须来自上面的列表）——"
+            "**不能空着**：每条问题至少挂一个编号（只有纯粹问客户关系、决策链的问题才允许空），"
+            "否则前端会把它当成漏掉的前提再补一遍；",
+            "3. ask_internal 是要内部拉通的问题（含责任方），同样合并去重，且不要与 ask_customer 重复；",
+            "4. sync_sales 是要同步给销售 / 商务的**信息**，不是待办，3-5 条：必须覆盖"
+            "（a）暂不支持 / 待补依据带来的对外口径，（b）影响报价或交付周期的结论，"
+            "（c）客户关系与决策链的信息；每条写清同步给谁、为什么必须同步；",
+            "5. 风险分为 high / medium / low，每条都要有应对建议；",
+            "6. next_actions 要具体、可指派、带时限 —— 它回答“下一步先办哪几件”，"
+            "不是要同步销售的信息，也不是要问谁的问题；",
+            "7. risks 与 next_actions 每条都必须写 based_on：填上面匹配结果里的**需求编号**（整数数组，"
             "例如 [1, 3]），编号必须来自上面的列表，至少一个 —— 售前会顺着它去核对依据。",
         ]
     )

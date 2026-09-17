@@ -1,10 +1,18 @@
 import { useState } from 'react';
-import type { Match, Priority, Requirement } from '../../api/types';
+import type { Match, MatchStatus, Priority, Requirement } from '../../api/types';
 import type { ProjectTabProps } from '../../pages/ProjectWorkspacePage';
-import { api, pollJob } from '../../api/endpoints';
+import { api } from '../../api/endpoints';
 import { summarizeOpenQuestion } from '../../domain/openQuestions';
-import { RISK_LEVEL_LABEL, risksForMatch } from '../../domain/risk';
-import { PRIORITY_META, PRIORITY_TAG, countByStatus, sortByPriority } from '../../domain/status';
+import { RISK_LEVEL_LABEL, RISK_LEVELS, risksForMatch } from '../../domain/risk';
+import type { RequirementRisk } from '../../domain/risk';
+import {
+  MATCH_STATUS_META,
+  PRIORITY_META,
+  PRIORITY_TAG,
+  STATUS_ORDER,
+  countByStatus,
+  sortByPriority,
+} from '../../domain/status';
 import { StatusBadge } from '../badges';
 import { MatchDetail } from './MatchDetail';
 import { SummaryBar } from './SummaryBar';
@@ -15,29 +23,30 @@ import {
   IconChevronDown,
   IconEvidence,
   IconPlus,
-  IconSpark,
 } from '../icons';
 
 const CATEGORIES = ['部署', '产品能力', '技术', '合规', '规模', '服务'];
 
+/** 筛选键：判断结果四档 + 风险三级，两套互斥（不做叠加，免得出现要解释的空态） */
+type FilterKey = 'all' | MatchStatus | 'risk-high' | 'risk-medium' | 'risk-low';
+
 /**
- * 需求确认：把客户要什么变成一份可核对的清单，并在这里把「能不能做」一条条判掉。
+ * 能力匹配：只看已进基线的需求，以及它对应的能力结论。
  *
- * 一条主线：点「确认」= 这条需求进基线 + 立刻做能力判断，结论与风险原地长在这张卡上。
- * 还没有定论的事（要问客户、要问内部、要同步销售）统一在售前建议页 ——
- * 这一页只回答"客户要什么、这条我们能不能做"。
+ * 确认这一层在「材料解析」页做（材料里读出什么、客户原文怎么写，在那里最顺手）：
+ * 确认后立刻跑匹配，结果落到这一页 —— 支持情况、风险、依据都在卡片上。
+ * 还没定论的事（要问客户、要问内部、要同步销售）统一在售前建议页。
  */
 export function RequirementsModule({
   project,
   matches,
   refresh,
   runTask,
-  busy,
 }: ProjectTabProps & { matches: Match[] }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<Partial<Requirement>>({});
   const [showAdd, setShowAdd] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const [filter, setFilter] = useState<FilterKey>('all');
   /** 正在判断的需求：卡片上要先说"我在判"，别让人以为点漏了 */
   const [judging, setJudging] = useState<number[]>([]);
   /** 展开了依据详情的需求 */
@@ -50,11 +59,12 @@ export function RequirementsModule({
   }>({ title: '', detail: '', category: '产品能力', priority: 'medium' });
   const toast = useToast();
 
-  const requirements = project.requirements ?? [];
-  const confirmed = requirements.filter((item) => item.status === 'confirmed');
-  const inferred = requirements.filter((item) => item.created_by_ai && item.status !== 'confirmed');
+  /** 这一页只看已进基线的需求：草稿在「材料解析」页确认，确认后才出现（并且立刻有结论） */
+  const allRequirements = project.requirements ?? [];
+  const requirements = allRequirements.filter((item) => item.status === 'confirmed');
+  /** 还在材料解析页等确认的条数：结论条上要说一声，免得以为漏了 */
+  const draftsLeft = allRequirements.filter((item) => item.status !== 'confirmed').length;
   const materials = project.materials ?? [];
-  const parsedMaterials = materials.filter((item) => item.status === 'parsed');
   const questions = project.open_questions ?? [];
   const judgementQuestions = questions.filter((item) => summarizeOpenQuestion(item).affectsJudgement);
   const matchByRequirement = new Map(matches.map((item) => [item.requirement_id, item]));
@@ -78,35 +88,63 @@ export function RequirementsModule({
       ]
         .filter(Boolean)
         .join('，')
-    : '确认后自动判断';
-  /**
-   * 顺序 = 优先级（P0 → P1 → P2），同一档内保持抽出来的次序。
-   *
-   * 这样"最该先确认的"永远在最上面；确认动作本身不改优先级，
-   * 所以点完「确认」那一条仍然留在原位。
-   */
+    : '还没有匹配结果';
+  /** 顺序 = 优先级（P0 → P1 → P2），同一档内保持抽出来的次序 */
   const orderedRequirements = sortByPriority(requirements);
-  /** 第一条还没确认的需求：结论条上的「待确认」落到它上面 */
-  const firstDraftId = requirements.find((item) => item.status !== 'confirmed')?.id;
   const openJudgement = () => {
     window.location.hash = `/projects/${project.id}/judgement`;
   };
   const canSeeAdvice = requirements.length > 0;
   /** 已确认但还没出结论的条数：确认过、判断没跑完（或跑失败）时会用到 */
-  const unjudged = confirmed.filter((item) => !matchByRequirement.has(item.id)).length;
+  const unjudged = requirements.filter((item) => !matchByRequirement.has(item.id)).length;
 
   /**
-   * 下一步：结论条最后一句必须回答"接下来做什么"，这一页的下一步分三种情况 ——
-   * 还有草稿 → 先确认（主按钮就是「全部确认」）；确认完没判完 → 补判断；
-   * 都判完了 → 去售前建议看风险与「要问谁」。
+   * 筛选：支持四档按判断结果筛，风险三级按"挂在这条需求上的风险"筛。
+   * 风险用和卡片同一套规则算出来（risksForMatch），筛选数字和看到的行数必须同源。
+   */
+  const risksByRequirement = new Map<number, RequirementRisk[]>(
+    matches.map((item) => [item.requirement_id, risksForMatch(item, solutionRisks)]),
+  );
+  const riskCounts: Record<'high' | 'medium' | 'low', number> = {
+    high: requirements.filter((item) =>
+      risksByRequirement.get(item.id)?.some((risk) => risk.level === 'high'),
+    ).length,
+    medium: requirements.filter((item) =>
+      risksByRequirement.get(item.id)?.some((risk) => risk.level === 'medium'),
+    ).length,
+    low: requirements.filter((item) =>
+      risksByRequirement.get(item.id)?.some((risk) => risk.level === 'low'),
+    ).length,
+  };
+  const riskLevel = filter.startsWith('risk-')
+    ? (filter.slice('risk-'.length) as 'high' | 'medium' | 'low')
+    : null;
+  const statusFilter: MatchStatus | null =
+    riskLevel || filter === 'all' ? null : (filter as MatchStatus);
+  const visibleRequirements = riskLevel
+    ? orderedRequirements.filter((item) =>
+        risksByRequirement.get(item.id)?.some((risk) => risk.level === riskLevel),
+      )
+    : statusFilter
+      ? orderedRequirements.filter((item) => matchByRequirement.get(item.id)?.status === statusFilter)
+      : orderedRequirements;
+  const hasRisk = requirements.some((item) => (risksByRequirement.get(item.id)?.length ?? 0) > 0);
+
+  /**
+   * 下一步：这一页是"看结果"的地方，所以下一步不在本页 ——
+   * 没确认的草稿回材料解析页；有确认但没判完的，就地补判断；都判完就去售前建议。
    */
   const nextStepLine: SummaryLine = !requirements.length
-    ? { label: '下一步', text: '先整理出需求，再逐条核对', target: 'requirements-list' }
-    : inferred.length
+    ? {
+        label: '下一步',
+        text: '去材料解析确认需求，确认后自动匹配',
+        href: `/projects/${project.id}/materials`,
+      }
+    : draftsLeft
       ? {
           label: '下一步',
-          text: `确认这 ${inferred.length} 条草稿，确认后立刻出结论`,
-          target: 'requirements-list',
+          text: `还有 ${draftsLeft} 条草稿在材料解析页等确认`,
+          href: `/projects/${project.id}/materials`,
         }
       : unjudged
         ? { label: '下一步', text: `还有 ${unjudged} 条没出结论，点「补一次判断」`, target: 'requirements-list' }
@@ -131,53 +169,6 @@ export function RequirementsModule({
 
   const toggleDetail = (id: number) =>
     setOpenDetail((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-
-  /**
-   * 单条确认 = 进基线 + 立刻判断。
-   * 判断在服务端跑，确认接口会返回那个任务；这里跟着它走，跑完原地刷新出结论。
-   */
-  const confirmOne = async (id: number) => {
-    markJudging(id, true);
-    try {
-      const result = await api.confirmRequirements(project.id, [id]);
-      await refresh();
-      if (!result.job_id) {
-        toast.push('已确认', 'success');
-        return;
-      }
-      const finished = await pollJob(result.job_id);
-      await refresh();
-      if (finished.status === 'failed') {
-        toast.push(finished.error ? `判断失败：${finished.error}` : '判断失败', 'error');
-      } else {
-        toast.push('已确认，判断结果就在卡片上', 'success');
-      }
-    } catch (error) {
-      toast.push(error instanceof Error ? error.message : '确认失败', 'error');
-    } finally {
-      markJudging(id, false);
-    }
-  };
-
-  const confirmAll = async () => {
-    setConfirming(true);
-    try {
-      const result = await api.confirmRequirements(project.id);
-      await refresh();
-      if (result.job_id) {
-        toast.push(`已确认 ${result.confirmed} 条，正在判断`, 'success');
-        await pollJob(result.job_id);
-        await refresh();
-        toast.push('判断完成，结果在每条需求上', 'success');
-      } else {
-        toast.push(`已确认 ${result.confirmed} 条需求`, 'success');
-      }
-    } catch (error) {
-      toast.push(error instanceof Error ? error.message : '确认失败', 'error');
-    } finally {
-      setConfirming(false);
-    }
-  };
 
   /** 早先确认过、但还没出结论的需求：补一次判断，不用整批重跑 */
   const judgeOne = async (id: number) => {
@@ -239,10 +230,10 @@ export function RequirementsModule({
     toast.push('已添加', 'success');
   };
 
-  const renderRequirement = (item: Requirement, tone: 'confirmed' | 'draft', anchorId?: string) => {
+  const renderRequirement = (item: Requirement) => {
     const match = matchByRequirement.get(item.id);
     const evidenceCount = (match?.capability_doc_ids.length ?? 0) + 1;
-    const risks = match ? risksForMatch(match, solutionRisks) : [];
+    const risks = risksByRequirement.get(item.id) ?? [];
     const isJudging = judging.includes(item.id);
     const detailOpen = openDetail.includes(item.id);
 
@@ -304,13 +295,7 @@ export function RequirementsModule({
     }
 
     return (
-      <li
-        key={item.id}
-        id={`requirement-${item.id}`}
-        className={`req-item${tone === 'draft' ? ' req-item--draft' : ''}`}
-      >
-        {/* 第一条草稿的锚点：结论条上的「待确认」点一下就落到这里 */}
-        {anchorId ? <span id={anchorId} className="anchor-mark" aria-hidden="true" /> : null}
+      <li key={item.id} id={`requirement-${item.id}`} className="req-item">
         {/* 优先级胶囊本身就是入口：点一下换档（P0/P1/P2），改完列表按新档位重排 */}
         <details className="prio-menu">
           <summary
@@ -334,11 +319,7 @@ export function RequirementsModule({
           </div>
         </details>
         <div className="req-brief__main">
-          <span className="req-brief__title">
-            {item.title}
-            {/* 状态就在标题上：这份清单只按"草稿/已进基线"区分 */}
-            {tone === 'draft' ? <span className="req-brief__draft">草稿</span> : null}
-          </span>
+          <span className="req-brief__title">{item.title}</span>
           {item.detail ? (
             <p className="req-item__detail" title={item.detail}>
               {item.detail}
@@ -421,26 +402,16 @@ export function RequirementsModule({
             </div>
           ) : isJudging ? (
             <p className="req-result req-result--pending">正在判断这条需求能不能做…</p>
-          ) : tone === 'confirmed' ? (
+          ) : (
             <p className="hint hint--inline req-result__missing">
               这条还没有判断结论 ·{' '}
               <button type="button" className="link-btn" onClick={() => void judgeOne(item.id)}>
                 补一次判断
               </button>
             </p>
-          ) : null}
+          )}
 
           <div className="req-item__actions">
-            {tone === 'draft' ? (
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                disabled={isJudging}
-                onClick={() => void confirmOne(item.id)}
-              >
-                {isJudging ? '判断中…' : '确认'}
-              </button>
-            ) : null}
             <details className="card-menu">
               <summary aria-label="更多操作">···</summary>
               <div className="card-menu__body">
@@ -469,15 +440,15 @@ export function RequirementsModule({
     <div className="page page--stack">
       {/* 结论条：和另外两个功能页同一套骨架（一句结论 + 概括行 + 数字 + 主动作） */}
       <SummaryBar
-        tone={inferred.length ? 'warn' : confirmed.length ? 'ok' : 'info'}
+        tone={!requirements.length ? 'info' : statusCounts.none || statusCounts.unknown ? 'warn' : 'ok'}
         verdict={
           !requirements.length
-            ? '还没有整理出需求'
-            : inferred.length
-              ? `${confirmed.length} 条已确认，${inferred.length} 条等你确认`
-              : `${requirements.length} 条需求已全部确认`
+            ? '还没有已确认的需求'
+            : draftsLeft
+              ? `${requirements.length} 条已进基线，另有 ${draftsLeft} 条待确认`
+              : `${requirements.length} 条需求的能力结论已就绪`
         }
-        sub={`共 ${requirements.length} 项 · 已确认 ${confirmed.length} · 已出结论 ${matches.length} · 来自 ${materials.length} 份客户材料`}
+        sub={`共 ${requirements.length} 项已确认 · 已出结论 ${matches.length} · 来自 ${materials.length} 份客户材料`}
         lines={[
           {
             label: '需求',
@@ -491,32 +462,24 @@ export function RequirementsModule({
           },
           nextStepLine,
           // 待澄清的统计不在这里：问题池住在售前建议的「要问谁」里，统计跟着它走。
-          // 这一页只在清单底下留一行入口（见页面底部），核对需求的时候不会断线。
+          // 这一页只在清单底下留一行入口（见页面底部），看结果的时候不会断线。
         ]}
         action={
-          inferred.length
-            ? {
-                label: confirming ? '确认中…' : `全部确认（${inferred.length}）`,
-                onClick: () => void confirmAll(),
-                disabled: confirming,
-              }
-            : // 没有草稿了，这一页该做的事就只剩"去下一段"
-              canSeeAdvice
-              ? { label: '去售前建议', onClick: openJudgement }
-              : undefined
-        }
-        // 左边是本页功能（全部确认），右边是「去下一段」；没有草稿时主按钮已经变成去下一段，这里就不重复
-        secondary={
-          inferred.length && canSeeAdvice ? { label: '查看建议', onClick: openJudgement } : undefined
+          // 这一页没有"确认"动作（在材料解析页做），主动作就是去下一段
+          canSeeAdvice ? { label: '去售前建议', onClick: openJudgement } : undefined
         }
       />
 
-      {materials.length === 0 ? (
+      {!requirements.length ? (
         <section className="intake-inline">
           <header className="intake-inline__head">
-            <h3>还没有客户材料</h3>
+            <h3>还没有已确认的需求</h3>
             <p className="hint">
-              去「材料解析」上传客户材料，Fitwise 会自动整理成这份需求清单；你只需要逐条确认。
+              {materials.length
+                ? draftsLeft
+                  ? `有 ${draftsLeft} 条需求在「材料解析」页等着确认 —— 在那儿看一眼客户原文，点「确认」就会自动跑能力匹配，结果回到这里。`
+                  : '材料里还没整理出需求。去「材料解析」上传或重新提取要点。'
+                : '先去「材料解析」上传客户材料，Fitwise 会自动整理出需求；确认之后在这里看能力结论。'}
             </p>
           </header>
           <div className="intake-inline__actions">
@@ -544,30 +507,68 @@ export function RequirementsModule({
               </h3>
               <HelpTip
                 text={
-                  '客户材料里读出来的要求都在这一份清单里，按优先级从高到低排。' +
+                  '这里只列已进基线的需求（确认在「材料解析」页做），按优先级从高到低排。' +
                   'P0 = 客户写了硬性口径（必须 / 不得 / 不低于），或不做就交付不了；' +
                   'P1 = 影响方案、报价或工期的关键条件；P2 = 加分项与可选范围。' +
                   'AI 标的档位会在原文里核对，找不到硬性表述就降一档；点左侧的 P0/P1/P2 可以自己改，改完列表立刻按新顺序排。' +
-                  '带「草稿」标记的还没确认；点「确认」后这条进基线，并且立刻对着企业内部资料判断能不能做 —— 结论、风险与依据都留在这一张卡上。'
+                  '改一条需求的内容（··· 里的「编辑」）会重跑这一条的能力判断 —— 结论不许停在旧版本上。'
                 }
               />
             </div>
             <div className="section-open__actions">
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={busy || parsedMaterials.length === 0}
-                onClick={() => void runTask(() => api.extractRequirements(project.id), '需求整理')}
-              >
-                <IconSpark width={14} height={14} />
-                {busy ? '整理中…' : '重新整理需求'}
-              </button>
               <button type="button" className="link-btn" onClick={() => setShowAdd((prev) => !prev)}>
                 <IconPlus width={13} height={13} />
                 手动新增
               </button>
             </div>
           </header>
+
+          {/* 筛选：支持四档按结论筛，风险三级按挂在这条需求上的风险筛（两套互斥，一次只看一种） */}
+          <div className="filter-chips" role="group" aria-label="筛选：按判断结果，或只看某一级风险">
+            <button
+              type="button"
+              className={`filter-chip${filter === 'all' ? ' filter-chip--active' : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              全部 {requirements.length}
+            </button>
+            {STATUS_ORDER.map((status) => (
+              <button
+                key={status}
+                type="button"
+                title={MATCH_STATUS_META[status].description}
+                className={`filter-chip filter-chip--${status}${
+                  filter === status ? ' filter-chip--active' : ''
+                }`}
+                disabled={statusCounts[status] === 0}
+                onClick={() => setFilter(filter === status ? 'all' : status)}
+              >
+                <span className={`filter-chip__dot filter-chip__dot--${status}`} />
+                {MATCH_STATUS_META[status].shortLabel} {statusCounts[status]}
+              </button>
+            ))}
+            {hasRisk ? (
+              <>
+                <span className="filter-chips__sep" aria-hidden="true" />
+                {RISK_LEVELS.map((level) => {
+                  const key = `risk-${level}` as FilterKey;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      title={`只看含${RISK_LEVEL_LABEL[level]}风险的需求`}
+                      className={`filter-chip${filter === key ? ' filter-chip--active' : ''}`}
+                      disabled={riskCounts[level] === 0}
+                      onClick={() => setFilter(filter === key ? 'all' : key)}
+                    >
+                      <span className={`filter-chip__dot filter-chip__dot--risk-${level}`} />
+                      {RISK_LEVEL_LABEL[level]}风险 {riskCounts[level]}
+                    </button>
+                  );
+                })}
+              </>
+            ) : null}
+          </div>
 
           {showAdd ? (
             <div className="create-form">
@@ -634,18 +635,13 @@ export function RequirementsModule({
 
           {requirements.length === 0 ? (
             <p className="empty-inline">
-              还没有需求。把材料交给 Fitwise 后会自动整理；也可以点上面的「手动新增」先记一条。
+              还没有已确认的需求。在「材料解析」页逐条确认后，结论会出现在这里；也可以点上面的「手动新增」先记一条。
             </p>
+          ) : visibleRequirements.length === 0 ? (
+            <p className="empty-inline">这一档暂时没有条目，换个筛选看看。</p>
           ) : (
             <ul className="req-brief">
-              {orderedRequirements.map((item) =>
-                renderRequirement(
-                  item,
-                  item.status === 'confirmed' ? 'confirmed' : 'draft',
-                  // 第一条草稿留个锚点：结论条上的「待确认」点一下就落到这里
-                  item.id === firstDraftId ? 'requirements-draft' : undefined,
-                ),
-              )}
+              {visibleRequirements.map((item) => renderRequirement(item))}
             </ul>
           )}
         </section>

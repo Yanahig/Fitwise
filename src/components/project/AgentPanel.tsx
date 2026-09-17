@@ -94,7 +94,7 @@ const NEXT_STEP_ACTION: Record<string, string> = {
 
 const NEXT_TARGET_ACTION: Record<string, string> = {
   materials: '去材料页',
-  requirements: '去需求页',
+  requirements: '去能力匹配',
   judgement: '去看建议',
 };
 
@@ -675,7 +675,7 @@ export function AgentPanel({
     }
     const requirements = finished.result?.requirements;
     if (typeof requirements === 'number') {
-      return `整理出 ${requirements} 条需求，去需求确认逐条核对。`;
+      return `整理出 ${requirements} 条需求，去材料解析逐条确认（每条下面有客户原文那一句）。`;
     }
     const version = finished.result?.version;
     if (typeof version === 'number') {

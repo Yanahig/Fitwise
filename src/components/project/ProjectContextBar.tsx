@@ -11,7 +11,7 @@ export type ModuleKey = 'materials' | 'requirements' | 'judgement';
 /** 三个功能的中文名：Agent 面板的「正在看」也读这一份，避免各写一套 */
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   materials: '材料解析',
-  requirements: '需求确认',
+  requirements: '能力匹配',
   judgement: '售前建议',
 };
 
@@ -89,9 +89,10 @@ export function ProjectContextBar({
   }, []);
   const moduleCounts: Record<ModuleKey, number> = {
     materials: project.materials?.length ?? 0,
-    requirements: project.requirements?.length ?? 0,
+    // 能力匹配页列的是已进基线的需求，徽标就数它们（未确认的草稿在材料解析页）
+    requirements: (project.requirements ?? []).filter((item) => item.status === 'confirmed').length,
     // 售前建议徽标 = 还没定的事有多少条（要问客户 + 要问内部 + 要同步销售），
-    // 与那一页的标题计数同源 —— 逐条判断的条数在需求确认页上
+    // 与那一页的标题计数同源 —— 逐条结论在能力匹配页上
     judgement: buildActionGroups(project, matches).total,
   };
 

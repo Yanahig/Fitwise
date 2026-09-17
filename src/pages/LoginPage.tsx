@@ -42,7 +42,7 @@ export function LoginPage() {
           </span>
           <div>
             <h1>Fitwise</h1>
-            <p>售前决策助手 · 材料解析 × 需求确认 × 售前建议</p>
+            <p>售前决策助手 · 材料解析 × 能力匹配 × 售前建议</p>
           </div>
         </div>
 

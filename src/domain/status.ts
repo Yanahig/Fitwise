@@ -57,7 +57,7 @@ export const PRIORITY_META: Record<Priority, { label: string; tone: 'high' | 'me
   low: { label: '低', tone: 'low' },
 };
 
-/** 条目左侧的优先级小徽标：需求确认与判断条目共用同一套写法 */
+/** 条目左侧的优先级小徽标：材料解析页的项目需求与能力匹配页共用同一套写法 */
 export const PRIORITY_TAG: Record<Priority, string> = { high: 'P0', medium: 'P1', low: 'P2' };
 
 /**

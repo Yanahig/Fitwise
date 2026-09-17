@@ -3510,6 +3510,44 @@ details[open] > summary .group-chevron {
   font-weight: 600;
 }
 
+/* 已确认标记：确认动作在材料解析页做，这个标记就是那一页的状态 */
+.req-brief__done {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--status-full-bg);
+  color: var(--status-full-fg);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* 客户原文那一句：确认时看的就是它，所以直接摆在卡片上，不用再翻 PDF */
+.req-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-surface-2);
+  color: var(--color-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.req-quote__text::before {
+  content: '「';
+}
+
+.req-quote__text::after {
+  content: '」';
+}
+
+.req-quote__src {
+  color: var(--color-tertiary-foreground);
+  font-size: var(--text-xs);
+}
+
 .req-brief__meta {
   display: flex;
   flex-wrap: wrap;

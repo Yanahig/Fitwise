@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import type { Material, ProjectHighlight } from '../../api/types';
+import type { Material, Priority, ProjectHighlight, Requirement } from '../../api/types';
 import type { ProjectTabProps } from '../../pages/ProjectWorkspacePage';
-import { api } from '../../api/endpoints';
+import { api, pollJob } from '../../api/endpoints';
 import { MATERIAL_ACCEPT, MATERIAL_TYPE_LABEL, isSupportedFile, materialStatusLabel, materialType } from '../../domain/materials';
 import { PRIORITY_TAG, sortByPriority } from '../../domain/status';
 import { useToast } from '../Toast';
@@ -9,6 +9,8 @@ import { useAuth } from '../../state/AuthContext';
 import { HelpTip } from '../HelpTip';
 import { SummaryBar } from './SummaryBar';
 import { IconEvidence, IconFile } from '../icons';
+
+const CATEGORIES = ['部署', '产品能力', '技术', '合规', '规模', '服务'];
 
 function shortDate(value: string): string {
   const date = new Date(value);
@@ -39,6 +41,12 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draftValue, setDraftValue] = useState('');
   const [savingFacts, setSavingFacts] = useState(false);
+  /** 确认了这一条、正在跑能力匹配 */
+  const [judging, setJudging] = useState<number[]>([]);
+  const [confirming, setConfirming] = useState(false);
+  /** 改写需求：确认之前把 AI 的措辞改对，别把错的话放进基线 */
+  const [editingRequirementId, setEditingRequirementId] = useState<number | null>(null);
+  const [requirementDraft, setRequirementDraft] = useState<Partial<Requirement>>({});
 
   const materials = project.materials ?? [];
   const llm = meta?.integrations?.llm;
@@ -141,7 +149,7 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
     '其他要点',
   ];
   /**
-   * 项目要点排成一张卡片清单，和需求确认同一套版式：
+   * 项目要点排成一张卡片清单，和能力匹配页的需求卡同一套版式：
    * 分类从"分组标题"变成每张卡左侧的标签，次序仍按固定分类顺序。
    * 认不出来的标签归到「其他要点」，不让它静默消失。
    */
@@ -160,7 +168,7 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
     requirements.filter((item) => item.source.material_id === materialId).length;
   /**
    * 项目需求：材料里读出来的需求，在材料页只作**事实留档**。
-   * 核对与能力判断在需求确认页 —— 那边是动作视图，这边是"材料说了什么"。
+   * 确认动作就在这一页（见下面的卡片）；结论在能力匹配页。
    * 顺序保持材料里的抽取次序（确认与否只改标签、不改位置）；
    * 人工新增的需求不是材料事实，所以不进这一块。
    */
@@ -174,6 +182,81 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
       await refresh();
     } catch (error) {
       toast.push(error instanceof Error ? error.message : '重新读取失败', 'error');
+    }
+  };
+
+  /**
+   * 需求确认就在这一页做：材料里读出来的要求，带着原文那一句摆在人面前，
+   * 点「确认」= 进基线 + 立刻跑能力匹配；未确认的永远是草稿，不进判断。
+   */
+  const markJudging = (id: number, on: boolean) =>
+    setJudging((prev) =>
+      on ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter((item) => item !== id),
+    );
+
+  const confirmRequirement = async (id: number) => {
+    markJudging(id, true);
+    try {
+      const result = await api.confirmRequirements(project.id, [id]);
+      await refresh();
+      if (!result.job_id) {
+        toast.push('已确认', 'success');
+        return;
+      }
+      const finished = await pollJob(result.job_id);
+      await refresh();
+      if (finished.status === 'failed') {
+        toast.push(finished.error ? `匹配失败：${finished.error}` : '匹配失败', 'error');
+      } else {
+        toast.push('已确认，能力匹配结果在「能力匹配」页', 'success');
+      }
+    } catch (error) {
+      toast.push(error instanceof Error ? error.message : '确认失败', 'error');
+    } finally {
+      markJudging(id, false);
+    }
+  };
+
+  const confirmAllRequirements = async () => {
+    setConfirming(true);
+    try {
+      const result = await api.confirmRequirements(project.id);
+      await refresh();
+      if (result.job_id) {
+        toast.push(`已确认 ${result.confirmed} 条，正在匹配`, 'success');
+        await pollJob(result.job_id);
+        await refresh();
+        toast.push('匹配完成，结果在「能力匹配」页', 'success');
+      } else {
+        toast.push(`已确认 ${result.confirmed} 条需求`, 'success');
+      }
+    } catch (error) {
+      toast.push(error instanceof Error ? error.message : '确认失败', 'error');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const saveRequirementEdit = async () => {
+    if (editingRequirementId === null) return;
+    try {
+      await api.updateRequirement(editingRequirementId, requirementDraft);
+      setEditingRequirementId(null);
+      setRequirementDraft({});
+      await refresh();
+      toast.push('已更新', 'success');
+    } catch (error) {
+      toast.push(error instanceof Error ? error.message : '保存失败', 'error');
+    }
+  };
+
+  const removeRequirement = async (id: number) => {
+    try {
+      await api.deleteRequirement(id);
+      await refresh();
+      toast.push('已移除');
+    } catch (error) {
+      toast.push(error instanceof Error ? error.message : '删除失败', 'error');
     }
   };
 
@@ -282,32 +365,32 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
           },
           {
             label: '下一步',
-            text: requirements.length
-              ? `去需求确认，逐条核对这 ${requirements.length} 条`
-              : '先整理出需求，再逐条核对',
-            href: `/projects/${project.id}/requirements`,
+            // 有草稿就先在这儿确认（确认即匹配）；都确认完了才往下一页走
+            text: draftCount
+              ? `确认这 ${draftCount} 条草稿，确认后立刻匹配`
+              : materialRequirements.length
+                ? '去能力匹配，看结论、风险与依据'
+                : '先整理出需求，再逐条确认',
+            ...(draftCount
+              ? { target: 'project-requirements' }
+              : { href: `/projects/${project.id}/requirements` }),
           },
         ]}
         action={
-          hasMaterials
-            ? requirements.length
-              ? {
-                  label: busy ? '处理中…' : '重新提取要点',
-                  onClick: () => void runTask(() => api.extractRequirements(project.id), '项目要点提取'),
-                  disabled: busy || parsed.length === 0,
-                }
-              : {
-                  label: busy ? '处理中…' : '提取要点',
-                  onClick: () => void runTask(() => api.extractRequirements(project.id), '项目要点提取'),
-                  disabled: busy || parsed.length === 0,
-                }
+          // 有草稿时，这一页的主动作是「全部确认」；重新提取要点让位到项目要点区
+          draftCount
+            ? {
+                label: confirming ? '确认中…' : `全部确认（${draftCount}）`,
+                onClick: () => void confirmAllRequirements(),
+                disabled: confirming,
+              }
             : undefined
         }
         secondary={
           // 左侧放本页功能；右侧固定是「去下一页」——三页统一
-          hasMaterials
+          materialRequirements.length
             ? {
-                label: '去需求确认',
+                label: '去能力匹配',
                 onClick: () => {
                   window.location.hash = `/projects/${project.id}/requirements`;
                 },
@@ -447,6 +530,15 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
               <HelpTip text="材料里明确写着的事实，每条都能点回原文核对。" />
             </div>
             <div className="section-open__actions">
+              {/* 重新提取要点同时刷新项目要点与项目需求，所以放在这一块（动作名和分区名一致） */}
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={busy || parsed.length === 0}
+                onClick={() => void runTask(() => api.extractRequirements(project.id), '项目要点提取')}
+              >
+                {busy ? '处理中…' : visibleHighlights.length ? '重新提取要点' : '提取要点'}
+              </button>
               {ignoredCount ? (
                 <button
                   type="button"
@@ -591,8 +683,8 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
         </section>
       ) : null}
 
-      {/* 项目需求：材料里读出来的要求，在这里只作事实记录（含还没确认的草稿），
-          版式与需求确认页的需求卡一致；同一条需求在「需求确认」里被核对、确认、做能力判断 */}
+      {/* 项目需求：材料里读出来的要求 + 客户原文那一句 —— 确认这一层就放在这里：
+          点「确认」= 进基线 + 立刻能力匹配；结果在「能力匹配」页看 */}
       {hasMaterials ? (
         <section className="section-open" id="project-requirements">
           <header className="section-open__head">
@@ -601,7 +693,13 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                 项目需求
                 <span className="fact-group__count">{materialRequirements.length}</span>
               </h3>
-              <HelpTip text="材料里读出来的要求，在这里只作事实留档、不算数；去「需求确认」逐条核对，确认后才进入能力判断。" />
+              <HelpTip
+                text={
+                  '材料里读出来的要求都在这。每一条下面那句引文是客户原文，确认时看它就行，不用翻 PDF。' +
+                  '点「确认」= 这条进基线，并且立刻对着企业内部资料做能力匹配；未确认的永远是草稿，不会进入判断。' +
+                  'AI 改写的措辞不对，先在 ··· 里「改写」，再确认。'
+                }
+              />
             </div>
             <div className="section-open__actions">
               <button
@@ -611,14 +709,14 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                   window.location.hash = `/projects/${project.id}/requirements`;
                 }}
               >
-                去需求确认
+                去能力匹配看结果
               </button>
             </div>
           </header>
 
           {materialRequirements.length === 0 ? (
             <p className="empty-inline">
-              还没从材料里读出需求。点右上角的「重新提取要点」，或去需求确认页手动新增。
+              还没从材料里读出需求。点上面「项目要点」里的「重新提取要点」，或去能力匹配页手动新增。
             </p>
           ) : (
             <ul className="req-brief">
@@ -631,40 +729,155 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
                     {PRIORITY_TAG[item.priority] ?? 'P1'}
                   </span>
                   <div className="req-brief__main">
-                    <span className="req-brief__title">
-                      {item.title}
-                      {/* 只标草稿：已确认的在这张清单里是常态，不用每条都挂一个「已确认」 */}
-                      {item.status === 'confirmed' ? null : (
-                        <span className="req-brief__draft">草稿</span>
-                      )}
-                    </span>
-                    {item.detail ? <p className="req-item__detail">{item.detail}</p> : null}
-                    <div className="req-brief__meta">
-                      <button
-                        type="button"
-                        className="link-btn req-brief__view"
-                        title={[
-                          item.source.document_name,
-                          item.source.page ? `第 ${item.source.page} 页` : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                        onClick={() => openSource(item.source.material_id, item.source.page)}
-                      >
-                        <IconEvidence width={13} height={13} />
-                        {[
-                          materials.length > 1 ? item.source.document_name ?? '' : '',
-                          item.source.page ? `第 ${item.source.page} 页` : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' · ') || '来源未标注'}
-                      </button>
-                      {item.edited ? (
-                        <span className="hint hint--inline" title="人工改过：重新整理时这条会保留">
-                          已人工修改
+                    {editingRequirementId === item.id ? (
+                      <div className="edit-stack">
+                        <input
+                          className="textarea"
+                          value={requirementDraft.title ?? item.title}
+                          onChange={(event) =>
+                            setRequirementDraft({ ...requirementDraft, title: event.target.value })
+                          }
+                        />
+                        <textarea
+                          className="textarea"
+                          rows={2}
+                          value={requirementDraft.detail ?? item.detail}
+                          onChange={(event) =>
+                            setRequirementDraft({ ...requirementDraft, detail: event.target.value })
+                          }
+                        />
+                        <div className="create-form__grid">
+                          <select
+                            className="textarea"
+                            value={requirementDraft.category ?? item.category}
+                            onChange={(event) =>
+                              setRequirementDraft({ ...requirementDraft, category: event.target.value })
+                            }
+                          >
+                            {CATEGORIES.map((category) => (
+                              <option key={category}>{category}</option>
+                            ))}
+                          </select>
+                          <select
+                            className="textarea"
+                            value={requirementDraft.priority ?? item.priority}
+                            onChange={(event) =>
+                              setRequirementDraft({
+                                ...requirementDraft,
+                                priority: event.target.value as Priority,
+                              })
+                            }
+                          >
+                            <option value="high">高优先级</option>
+                            <option value="medium">中优先级</option>
+                            <option value="low">低优先级</option>
+                          </select>
+                        </div>
+                        <div className="req-item__actions">
+                          <button
+                            type="button"
+                            className="btn btn--primary btn--sm"
+                            onClick={() => void saveRequirementEdit()}
+                          >
+                            保存
+                          </button>
+                          <button
+                            type="button"
+                            className="link-btn"
+                            onClick={() => {
+                              setEditingRequirementId(null);
+                              setRequirementDraft({});
+                            }}
+                          >
+                            取消
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="req-brief__title">
+                          {item.title}
+                          {item.status === 'confirmed' ? (
+                            <span className="req-brief__done">已确认</span>
+                          ) : (
+                            <span className="req-brief__draft">草稿</span>
+                          )}
                         </span>
-                      ) : null}
-                    </div>
+                        {item.detail ? <p className="req-item__detail">{item.detail}</p> : null}
+                        {/* 客户原文那一句：确认时看的就是它，不用翻 PDF */}
+                        {item.source.excerpt ? (
+                          <p className="req-quote">
+                            <span className="req-quote__text">{item.source.excerpt}</span>
+                            <span className="req-quote__src">
+                              {item.source.document_name}
+                              {item.source.page ? ` · 第 ${item.source.page} 页` : ''}
+                            </span>
+                          </p>
+                        ) : null}
+                        <div className="req-brief__meta">
+                          <button
+                            type="button"
+                            className="link-btn req-brief__view"
+                            title={[
+                              item.source.document_name,
+                              item.source.page ? `第 ${item.source.page} 页` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                            onClick={() => openSource(item.source.material_id, item.source.page)}
+                          >
+                            <IconEvidence width={13} height={13} />
+                            {[
+                              materials.length > 1 ? item.source.document_name ?? '' : '',
+                              item.source.page ? `第 ${item.source.page} 页` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || '来源未标注'}
+                          </button>
+                          {item.edited ? (
+                            <span className="hint hint--inline" title="人工改过：重新整理时这条会保留">
+                              已人工修改
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="req-item__actions">
+                          {item.status === 'confirmed' ? null : (
+                            <button
+                              type="button"
+                              className="btn btn--primary btn--sm"
+                              disabled={judging.includes(item.id)}
+                              onClick={() => void confirmRequirement(item.id)}
+                            >
+                              {judging.includes(item.id) ? '匹配中…' : '确认'}
+                            </button>
+                          )}
+                          <details className="card-menu">
+                            <summary aria-label="更多操作">···</summary>
+                            <div className="card-menu__body">
+                              {item.status === 'confirmed' ? null : (
+                                <button
+                                  type="button"
+                                  className="link-btn"
+                                  onClick={() => {
+                                    setEditingRequirementId(item.id);
+                                    setRequirementDraft({});
+                                  }}
+                                >
+                                  改写
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="link-btn"
+                                onClick={() => void removeRequirement(item.id)}
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </details>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </li>
               ))}

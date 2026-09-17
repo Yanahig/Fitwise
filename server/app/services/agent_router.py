@@ -90,14 +90,15 @@ def next_step(state: dict[str, int]) -> dict | None:
     if not (state["requirements_draft"] or state["requirements_confirmed"]):
         return {"label": "整理需求", "tool": "run_extraction", "blocked": False, "target": "requirements"}
     if not state["requirements_confirmed"]:
+        # 确认这一层在材料解析页做（客户原文就在那条需求下面）
         return {
             "label": f"确认这 {state['requirements_draft']} 条需求",
             "tool": None,
             "blocked": True,
-            "target": "requirements",
+            "target": "materials",
         }
     if not state["matches"]:
-        # 结论落在需求卡上：判断跑完去需求确认页看，售前建议页只放风险与要问谁
+        # 确认后自动匹配，结论落在能力匹配页；售前建议页只放风险与要问谁
         return {"label": "做能力判断", "tool": "run_matching", "blocked": False, "target": "requirements"}
     if not state["solutions"]:
         return {"label": "生成售前建议", "tool": "compose_solution", "blocked": False, "target": "judgement"}

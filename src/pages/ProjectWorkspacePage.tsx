@@ -19,7 +19,7 @@ export interface ProjectTabProps {
   busy: boolean;
 }
 
-/** 产品结构就是这三个功能：材料解析 → 需求确认 → 售前建议，没有中间步骤 */
+/** 产品结构就是这三个功能：材料解析（含确认）→ 能力匹配 → 售前建议，没有中间步骤 */
 const MODULE_TABS: ModuleKey[] = ['materials', 'requirements', 'judgement'];
 
 function isModuleTab(value: string): value is ModuleKey {
@@ -213,7 +213,7 @@ export function ProjectWorkspacePage({
       {moduleTab === 'judgement' ? (
         <div className="workspace-grid">
           <div className="workspace-grid__main">
-            {/* 逐条判断在需求卡上（需求确认页）；这一页负责结论、风险与「要问谁」 */}
+            {/* 逐条结论在能力匹配页；这一页负责风险与「要问谁」 */}
             <JudgementPage
               project={project}
               matches={matches}

@@ -15,7 +15,7 @@ const RISK_ORDER: Record<RiskLevel, number> = { high: 0, medium: 1, low: 2 };
 /**
  * 售前建议：回答「这个项目现在什么结论、还剩什么事没定」。
  *
- * 逐条判断已经回到需求卡上（需求确认页）：这一页只放三块 ——
+ * 逐条判断在能力匹配页的需求卡上：这一页只放三块 ——
  * 结论（整体判断与匹配度）、风险（判断的后果）、要问谁（问题池按对象分组的执行视图）。
  */
 export function JudgementPage({
@@ -33,20 +33,20 @@ export function JudgementPage({
   const requirementsHref = `/projects/${project.id}/requirements`;
 
   if (matches.length === 0) {
-    // 空态和「材料解析 / 需求确认」同一套骨架：保留结论条，内容区用 intake-inline 提示块
+    // 空态和「材料解析 / 能力匹配」同一套骨架：保留结论条，内容区用 intake-inline 提示块
     const parsedCount = project.counts?.materials_parsed ?? project.materials?.length ?? 0;
     const confirmedCount = project.counts?.requirements_confirmed ?? 0;
     const missingStep =
       parsedCount === 0
         ? { label: '去材料解析', target: 'materials' }
         : confirmedCount === 0
-          ? { label: '去需求确认', target: 'requirements' }
+          ? { label: '去材料解析确认', target: 'materials' }
           : null;
     const sub = !parsedCount
       ? '先在「材料解析」上传材料；读完会自动整理成需求，确认之后我才能逐条判断。'
       : !confirmedCount
-        ? '需求还没确认。去「需求确认」逐条确认，确认后能力结论会直接长在需求卡片上。'
-        : '需求已确认，把判断跑一遍就能出建议了。';
+        ? '需求还没确认。去「材料解析」逐条确认（每条下面有客户原文那一句），确认后会自动做能力匹配。'
+        : '需求已确认，把能力匹配跑一遍就能出建议了。';
     return (
       <div className="page page--stack">
         <SummaryBar tone="info" verdict="还没有判断结论" sub={sub} />
@@ -67,7 +67,7 @@ export function JudgementPage({
                 {missingStep.label}
               </button>
             ) : (
-              // 已经确认过、只是还没判断：回需求确认页逐条判断（结论落在那里）
+              // 已经确认过、只是还没匹配：去能力匹配页对没结论的条目「补一次判断」
               <button
                 type="button"
                 className="btn btn--primary btn--sm"
@@ -75,7 +75,7 @@ export function JudgementPage({
                   window.location.hash = requirementsHref;
                 }}
               >
-                去需求确认做判断
+                去能力匹配补判断
               </button>
             )}
           </div>
@@ -135,7 +135,7 @@ export function JudgementPage({
    * 这一页只留"还剩什么没定"（风险 / 下一步）。
    */
   const nextActionText = actions.sales[0]?.text ?? actions.customer[0]?.text ?? '还没有下一步建议，先生成一份建议';
-  /** 待澄清统计跟着「要问谁」走：需求页只在清单底下留一行入口，这里才是它的家 */
+  /** 待澄清统计跟着「要问谁」走：能力匹配页只在清单底下留一行入口，这里才是它的家 */
   const openQuestions = project.open_questions ?? [];
   const customerQuestionCount = openQuestions.filter((item) => (item.owner || '客户') !== '内部').length;
   const summaryLines: SummaryLine[] = [
@@ -209,7 +209,7 @@ export function JudgementPage({
               }
             : undefined
         }
-        secondary={{ label: '去需求确认', onClick: () => (window.location.hash = requirementsHref) }}
+        secondary={{ label: '去能力匹配', onClick: () => (window.location.hash = requirementsHref) }}
       />
 
       {/* 风险：每条都挂着它依据的那条需求 —— 逐条结论与依据在需求卡上，这里只排优先级 */}

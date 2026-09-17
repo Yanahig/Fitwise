@@ -24,13 +24,13 @@ const GUIDE_STEPS = [
     key: 'materials',
     to: 'materials',
     title: '材料解析',
-    hint: '材料丢进来，Fitwise 自动读完、按页存档并摘出要点',
+    hint: '材料丢进来，自动读完并按页存档；摘出的要点与需求都带原文那一句，逐条确认后进入能力匹配',
   },
   {
     key: 'requirements',
     to: 'requirements',
-    title: '需求确认',
-    hint: '逐条核对客户需求，确认后立刻判断能不能做',
+    title: '能力匹配',
+    hint: '已确认的需求在这里出结论：完全支持 / 部分支持 / 暂不支持 / 待补依据，以及风险',
   },
   {
     key: 'judgement',

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -147,6 +147,35 @@ async def _run_matching(job_id: str, project_id: int, actor: str, requirement_id
             jobs.fail_job(job_id, "还没有已确认的需求：先确认需求，我才能做能力判断")
             return
 
+        # 人工覆写过的结论不容 AI 再改：这条需求直接跳过，不生成新结论。
+        # （界面上取结论也一律 human 优先，这是"人做承诺"那条底线在代码里的落点）
+        human_locked = {
+            row[0]
+            for row in db.execute(
+                select(MatchResult.requirement_id).where(
+                    MatchResult.requirement_id.in_([item.id for item in requirements]),
+                    MatchResult.judgment_source == "human",
+                )
+            ).all()
+        }
+        requirements = [item for item in requirements if item.id not in human_locked]
+        if not requirements:
+            log_activity(
+                db,
+                actor=actor,
+                type="matches_completed",
+                summary=f"能力匹配跳过：{len(human_locked)} 条需求已由人工判定，不重跑",
+                customer_id=project.customer_id,
+                project_id=project.id,
+            )
+            db.commit()
+            jobs.finish_job(
+                job_id,
+                result={"matches": 0, "human_locked": len(human_locked), "trace_id": job_id},
+                message=f"已由人工判定的 {len(human_locked)} 条需求跳过，未产生新结论",
+            )
+            return
+
         jobs.update_job(job_id, total=len(requirements))
         # 清理旧的 AI 结论（人工覆写的保留）
         existing = (
@@ -248,6 +277,7 @@ async def _run_matching(job_id: str, project_id: int, actor: str, requirement_id
             result={
                 "matches": len(results),
                 "counts": counts,
+                "human_locked": len(human_locked),
                 "guardrail_flagged": flagged,
                 "llm_fallback": fallback,
                 "open_questions": len(project.open_questions or []),
@@ -498,7 +528,10 @@ def delete_requirement(
 def run_matching(
     project_id: int,
     background: BackgroundTasks,
-    requirement_ids: list[int] | None = None,
+    # 必须显式声明成查询参数：list 类型默认会被 FastAPI 当成 body，
+    # 于是前端用 `?requirement_ids=1&requirement_ids=2` 传的"只重跑这几条"会被静默忽略，
+    # 变成整批重跑（多花 token，还会顺手改掉别的结论）。
+    requirement_ids: list[int] | None = Query(default=None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:

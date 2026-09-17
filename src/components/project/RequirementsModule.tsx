@@ -64,7 +64,22 @@ export function RequirementsModule({
   /** 还在材料解析页等确认的条数：结论条上要说一声，免得以为漏了 */
   const draftsLeft = allRequirements.filter((item) => item.status !== 'confirmed').length;
   const materials = project.materials ?? [];
-  const matchByRequirement = new Map(matches.map((item) => [item.requirement_id, item]));
+  /**
+   * 一条需求取哪份结论：**人工判定优先**。
+   *
+   * 正常情况下库里一条需求只有一份结论（重跑时人工判定过的会被后端跳过），
+   * 但历史数据里可能同时存在"人工改的 + 之后又跑出来的 AI 结论"——
+   * 这种时候界面必须显示人定的那条，否则等于 AI 把人做的承诺盖掉了。
+   */
+  const matchByRequirement = new Map<number, Match>();
+  for (const item of matches) {
+    const current = matchByRequirement.get(item.requirement_id);
+    if (!current || (item.judgment_source === 'human' && current.judgment_source !== 'human')) {
+      matchByRequirement.set(item.requirement_id, item);
+    }
+  }
+  /** 去重后的结论：统计、筛选、下一步判定都读这一份，别把同一需求的两次结论算两遍 */
+  const effectiveMatches = [...matchByRequirement.values()];
   const solutionRisks = project.solution?.risks ?? [];
   /** 只有一份材料时不需要在每条需求上重复文件名，页码才是要找的东西 */
   const showSourceDocName = materials.length > 1;
@@ -75,8 +90,8 @@ export function RequirementsModule({
    * 只列有的档，顺序是「越靠前越需要人管」：待补依据 → 暂不支持 → 部分支持 → 完全支持。
    * 用顿号而不是「 · 」：四个档位连起来 27 个字，正好落在概括行的 30 字以内，不会被截成「…完全支…」。
    */
-  const statusCounts = countByStatus(matches.map((item) => item.status));
-  const statusText = matches.length
+  const statusCounts = countByStatus(effectiveMatches.map((item) => item.status));
+  const statusText = effectiveMatches.length
     ? [
         statusCounts.unknown ? `待补依据 ${statusCounts.unknown}` : '',
         statusCounts.none ? `暂不支持 ${statusCounts.none}` : '',
@@ -99,7 +114,7 @@ export function RequirementsModule({
    * 风险用和卡片同一套规则算出来（risksForMatch），筛选数字和看到的行数必须同源。
    */
   const risksByRequirement = new Map<number, RequirementRisk[]>(
-    matches.map((item) => [item.requirement_id, risksForMatch(item, solutionRisks)]),
+    effectiveMatches.map((item) => [item.requirement_id, risksForMatch(item, solutionRisks)]),
   );
   const riskCounts: Record<'high' | 'medium' | 'low', number> = {
     high: requirements.filter((item) =>
@@ -446,7 +461,7 @@ export function RequirementsModule({
         }
         sub={
           requirements.length
-            ? `共 ${requirements.length} 项已确认 · 已出结论 ${matches.length} · 来自 ${materials.length} 份客户材料`
+            ? `共 ${requirements.length} 项已确认 · 已出结论 ${effectiveMatches.length} · 来自 ${materials.length} 份客户材料`
             : draftsLeft
               ? // 空态的指引用一句话说完：结论条是唯一说这件事的地方，不另开提示块
                 `有 ${draftsLeft} 条需求在「材料解析」页等着确认 —— 在那儿能直接看到客户原文那一句，点「确认」就会自动跑能力匹配`

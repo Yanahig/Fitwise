@@ -33,7 +33,12 @@ export function JudgementPage({
   const requirementsHref = `/projects/${project.id}/requirements`;
 
   if (matches.length === 0) {
-    // 空态和「材料解析 / 能力匹配」同一套骨架：保留结论条，内容区用 intake-inline 提示块
+    /**
+     * 空态只保留结论条。
+     *
+     * 原来结论条下面还挂一个提示块，标题与 sub 都是同一句话再说一遍（"还没有判断结论" + 同一段说明），
+     * 现在指引文字进 sub、按钮进结论条的 action 位 —— 一屏只有一处说这件事。
+     */
     const parsedCount = project.counts?.materials_parsed ?? project.materials?.length ?? 0;
     const confirmedCount = project.counts?.requirements_confirmed ?? 0;
     const missingStep =
@@ -41,45 +46,25 @@ export function JudgementPage({
         ? { label: '去材料解析', target: 'materials' }
         : confirmedCount === 0
           ? { label: '去材料解析确认', target: 'materials' }
-          : null;
+          : { label: '去能力匹配补判断', target: 'requirements' };
     const sub = !parsedCount
       ? '先在「材料解析」上传材料；读完会自动整理成需求，确认之后我才能逐条判断。'
       : !confirmedCount
         ? '需求还没确认。去「材料解析」逐条确认（每条下面有客户原文那一句），确认后会自动做能力匹配。'
-        : '需求已确认，把能力匹配跑一遍就能出建议了。';
+        : '需求已确认，但还有条目没出结论 —— 去「能力匹配」对它们点一下「补一次判断」。';
     return (
       <div className="page page--stack">
-        <SummaryBar tone="info" verdict="还没有判断结论" sub={sub} />
-        <section className="intake-inline">
-          <header className="intake-inline__head">
-            <h3>还没有判断结论</h3>
-            <p className="hint">{sub}</p>
-          </header>
-          <div className="intake-inline__actions">
-            {missingStep ? (
-              <button
-                type="button"
-                className="btn btn--secondary btn--sm"
-                onClick={() => {
-                  window.location.hash = `/projects/${project.id}/${missingStep.target}`;
-                }}
-              >
-                {missingStep.label}
-              </button>
-            ) : (
-              // 已经确认过、只是还没匹配：去能力匹配页对没结论的条目「补一次判断」
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() => {
-                  window.location.hash = requirementsHref;
-                }}
-              >
-                去能力匹配补判断
-              </button>
-            )}
-          </div>
-        </section>
+        <SummaryBar
+          tone="info"
+          verdict="还没有判断结论"
+          sub={sub}
+          action={{
+            label: missingStep.label,
+            onClick: () => {
+              window.location.hash = `/projects/${project.id}/${missingStep.target}`;
+            },
+          }}
+        />
       </div>
     );
   }

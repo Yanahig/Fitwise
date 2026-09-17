@@ -94,7 +94,6 @@ export function RequirementsModule({
   const openJudgement = () => {
     window.location.hash = `/projects/${project.id}/judgement`;
   };
-  const canSeeAdvice = requirements.length > 0;
   /** 已确认但还没出结论的条数：确认过、判断没跑完（或跑失败）时会用到 */
   const unjudged = requirements.filter((item) => !matchByRequirement.has(item.id)).length;
 
@@ -448,7 +447,16 @@ export function RequirementsModule({
               ? `${requirements.length} 条已进基线，另有 ${draftsLeft} 条待确认`
               : `${requirements.length} 条需求的能力结论已就绪`
         }
-        sub={`共 ${requirements.length} 项已确认 · 已出结论 ${matches.length} · 来自 ${materials.length} 份客户材料`}
+        sub={
+          requirements.length
+            ? `共 ${requirements.length} 项已确认 · 已出结论 ${matches.length} · 来自 ${materials.length} 份客户材料`
+            : draftsLeft
+              ? // 空态的指引用一句话说完：结论条是唯一说这件事的地方，不另开提示块
+                `有 ${draftsLeft} 条需求在「材料解析」页等着确认 —— 在那儿能直接看到客户原文那一句，点「确认」就会自动跑能力匹配`
+              : materials.length
+                ? '材料里还没整理出需求。去「材料解析」上传或重新提取要点。'
+                : '先去「材料解析」上传客户材料，Fitwise 会自动整理出需求；确认之后在这里看能力结论。'
+        }
         lines={[
           {
             label: '需求',
@@ -465,36 +473,17 @@ export function RequirementsModule({
           // 这一页只在清单底下留一行入口（见页面底部），看结果的时候不会断线。
         ]}
         action={
-          // 这一页没有"确认"动作（在材料解析页做），主动作就是去下一段
-          canSeeAdvice ? { label: '去售前建议', onClick: openJudgement } : undefined
+          // 这一页没有"确认"动作（在材料解析页做）：没结果时指回去确认，有结果时去下一段
+          requirements.length
+            ? { label: '去售前建议', onClick: openJudgement }
+            : {
+                label: '去材料解析',
+                onClick: () => {
+                  window.location.hash = `/projects/${project.id}/materials`;
+                },
+              }
         }
       />
-
-      {!requirements.length ? (
-        <section className="intake-inline">
-          <header className="intake-inline__head">
-            <h3>还没有已确认的需求</h3>
-            <p className="hint">
-              {materials.length
-                ? draftsLeft
-                  ? `有 ${draftsLeft} 条需求在「材料解析」页等着确认 —— 在那儿看一眼客户原文，点「确认」就会自动跑能力匹配，结果回到这里。`
-                  : '材料里还没整理出需求。去「材料解析」上传或重新提取要点。'
-                : '先去「材料解析」上传客户材料，Fitwise 会自动整理出需求；确认之后在这里看能力结论。'}
-            </p>
-          </header>
-          <div className="intake-inline__actions">
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm"
-              onClick={() => {
-                window.location.hash = `/projects/${project.id}/materials`;
-              }}
-            >
-              去材料解析
-            </button>
-          </div>
-        </section>
-      ) : null}
 
       <div className="req-columns">
         {/* 一份清单：不按来源分家，也不按状态重排 —— 确认后原地变基线，位置不动 */}

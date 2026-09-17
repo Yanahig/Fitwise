@@ -157,14 +157,12 @@ export function MaterialsModule({ project, refresh, runTask, job, busy }: Projec
   const requirementCountOf = (materialId: number) =>
     requirements.filter((item) => item.source.material_id === materialId).length;
   /**
-   * 材料里读出来的需求：在材料页只作**事实留档**（草稿在前、已确认在后）。
+   * 材料里读出来的需求：在材料页只作**事实留档**。
    * 核对与能力判断在需求确认页 —— 那边是动作视图，这边是"材料说了什么"。
+   * 顺序保持材料里的抽取次序（确认与否只改标签、不改位置）；
    * 人工新增的需求不是材料事实，所以不进这一块。
    */
-  const materialRequirements = [
-    ...requirements.filter((item) => item.source.material_id && item.status !== 'confirmed'),
-    ...requirements.filter((item) => item.source.material_id && item.status === 'confirmed'),
-  ];
+  const materialRequirements = requirements.filter((item) => item.source.material_id);
 
   const retry = async (material: Material) => {
     try {

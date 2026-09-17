@@ -64,11 +64,16 @@ export function RequirementsModule({
   const showSourceDocName = materials.length > 1;
   const highPriority = requirements.filter((item) => item.priority === 'high').length;
   const gapCount = matches.filter((item) => item.status === 'none').length;
-  /** 草稿在前、基线在后：未确认的先处理，确认过的原地变成基线，不再跨分区搬家 */
-  const orderedRequirements = [
-    ...requirements.filter((item) => item.status !== 'confirmed'),
-    ...requirements.filter((item) => item.status === 'confirmed'),
-  ];
+  /**
+   * 顺序就是需求自己的次序（后端按抽取顺序给）。
+   *
+   * 不做「草稿在前、已确认在后」的分组：点「确认」之后那一条要留在原位 ——
+   * 一确认就跳到列表最下方，人会当场找不到自己刚点的那条，
+   * 尤其是「改一条、看一眼、再改下一条」的时候。
+   */
+  const orderedRequirements = requirements;
+  /** 第一条还没确认的需求：结论条上的「待确认」落到它上面 */
+  const firstDraftId = requirements.find((item) => item.status !== 'confirmed')?.id;
   const openJudgement = () => {
     window.location.hash = `/projects/${project.id}/judgement`;
   };
@@ -450,7 +455,7 @@ export function RequirementsModule({
       ) : null}
 
       <div className="req-columns">
-        {/* 一份清单，不再按「明说 / 推断」分家：草稿排前面、确认过的作为基线跟在后面 */}
+        {/* 一份清单：不按来源分家，也不按状态重排 —— 确认后原地变基线，位置不动 */}
         <section className="section-open" id="requirements-list">
           <header className="section-open__head">
             <div className="section-open__titleline">
@@ -546,12 +551,12 @@ export function RequirementsModule({
             </p>
           ) : (
             <ul className="req-brief">
-              {orderedRequirements.map((item, index) =>
+              {orderedRequirements.map((item) =>
                 renderRequirement(
                   item,
                   item.status === 'confirmed' ? 'confirmed' : 'draft',
                   // 第一条草稿留个锚点：结论条上的「待确认」点一下就落到这里
-                  index === 0 && inferred.length ? 'requirements-draft' : undefined,
+                  item.id === firstDraftId ? 'requirements-draft' : undefined,
                 ),
               )}
             </ul>

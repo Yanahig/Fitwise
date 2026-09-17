@@ -4131,7 +4131,7 @@ details[open] > summary .group-chevron {
 
 /* 客户需求：结论优先的顶部摘要 */
 .req-columns {
-  /* 一条主线读到底：待确认的先处理，已确认的作为基线跟在后面 */
+  /* 一条主线读到底：顺序就是需求自己的次序，确认与否不改变位置 */
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

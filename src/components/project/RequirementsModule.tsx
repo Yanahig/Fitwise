@@ -67,6 +67,7 @@ export function RequirementsModule({
    * 能力判断的分档分布：这一句从售前建议页搬过来 ——
    * 结论本来就长在这一页的卡片上，统计也该跟着结论走。
    * 只列有的档，顺序是「越靠前越需要人管」：待补依据 → 暂不支持 → 部分支持 → 完全支持。
+   * 用顿号而不是「 · 」：四个档位连起来 27 个字，正好落在概括行的 30 字以内，不会被截成「…完全支…」。
    */
   const statusCounts = countByStatus(matches.map((item) => item.status));
   const statusText = matches.length
@@ -77,7 +78,7 @@ export function RequirementsModule({
         statusCounts.full ? `完全支持 ${statusCounts.full}` : '',
       ]
         .filter(Boolean)
-        .join(' · ')
+        .join('，')
     : '确认后自动判断';
   /**
    * 顺序就是需求自己的次序（后端按抽取顺序给）。

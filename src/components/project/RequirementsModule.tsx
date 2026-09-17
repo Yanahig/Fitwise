@@ -8,6 +8,7 @@ import { PRIORITY_META, PRIORITY_TAG, countByStatus, sortByPriority } from '../.
 import { StatusBadge } from '../badges';
 import { MatchDetail } from './MatchDetail';
 import { SummaryBar } from './SummaryBar';
+import type { SummaryLine } from './SummaryBar';
 import { useToast } from '../Toast';
 import { HelpTip } from '../HelpTip';
 import {
@@ -91,6 +92,37 @@ export function RequirementsModule({
     window.location.hash = `/projects/${project.id}/judgement`;
   };
   const canSeeAdvice = requirements.length > 0;
+  /** 已确认但还没出结论的条数：确认过、判断没跑完（或跑失败）时会用到 */
+  const unjudged = confirmed.filter((item) => !matchByRequirement.has(item.id)).length;
+
+  /**
+   * 下一步：结论条最后一句必须回答"接下来做什么"，这一页的下一步分三种情况 ——
+   * 还有草稿 → 先确认（主按钮就是「全部确认」）；确认完没判完 → 补判断；
+   * 都判完了 → 去售前建议看风险与「要问谁」。
+   */
+  const nextStepLine: SummaryLine = !requirements.length
+    ? { label: '下一步', text: '先整理出需求，再逐条核对', target: 'requirements-list' }
+    : inferred.length
+      ? {
+          label: '下一步',
+          text: `确认这 ${inferred.length} 条草稿，确认后立刻出结论`,
+          target: 'requirements-list',
+        }
+      : unjudged
+        ? { label: '下一步', text: `还有 ${unjudged} 条没出结论，点「补一次判断」`, target: 'requirements-list' }
+        : {
+            label: '下一步',
+            text:
+              statusCounts.none || statusCounts.unknown
+                ? `去售前建议：${[
+                    statusCounts.none ? `${statusCounts.none} 条暂不支持` : '',
+                    statusCounts.unknown ? `${statusCounts.unknown} 条待补依据` : '',
+                  ]
+                    .filter(Boolean)
+                    .join('、')}要先谈`
+                : '去售前建议看风险与要问谁',
+            href: `/projects/${project.id}/judgement`,
+          };
 
   const markJudging = (id: number, on: boolean) =>
     setJudging((prev) =>
@@ -457,6 +489,7 @@ export function RequirementsModule({
             text: statusText,
             target: 'requirements-list',
           },
+          nextStepLine,
           // 待澄清的统计不在这里：问题池住在售前建议的「要问谁」里，统计跟着它走。
           // 这一页只在清单底下留一行入口（见页面底部），核对需求的时候不会断线。
         ]}
@@ -467,10 +500,15 @@ export function RequirementsModule({
                 onClick: () => void confirmAll(),
                 disabled: confirming,
               }
-            : undefined
+            : // 没有草稿了，这一页该做的事就只剩"去下一段"
+              canSeeAdvice
+              ? { label: '去售前建议', onClick: openJudgement }
+              : undefined
         }
-        // 左边永远是本页功能（全部确认），右边永远是「去下一段」——没有待确认时左侧就空着
-        secondary={canSeeAdvice ? { label: '查看建议', onClick: openJudgement } : undefined}
+        // 左边是本页功能（全部确认），右边是「去下一段」；没有草稿时主按钮已经变成去下一段，这里就不重复
+        secondary={
+          inferred.length && canSeeAdvice ? { label: '查看建议', onClick: openJudgement } : undefined
+        }
       />
 
       {materials.length === 0 ? (

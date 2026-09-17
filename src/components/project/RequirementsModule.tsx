@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { Match, MatchStatus, Priority, Requirement } from '../../api/types';
 import type { ProjectTabProps } from '../../pages/ProjectWorkspacePage';
 import { api } from '../../api/endpoints';
-import { summarizeOpenQuestion } from '../../domain/openQuestions';
 import { RISK_LEVEL_LABEL, RISK_LEVELS, risksForMatch } from '../../domain/risk';
 import type { RequirementRisk } from '../../domain/risk';
 import {
@@ -65,8 +64,6 @@ export function RequirementsModule({
   /** 还在材料解析页等确认的条数：结论条上要说一声，免得以为漏了 */
   const draftsLeft = allRequirements.filter((item) => item.status !== 'confirmed').length;
   const materials = project.materials ?? [];
-  const questions = project.open_questions ?? [];
-  const judgementQuestions = questions.filter((item) => summarizeOpenQuestion(item).affectsJudgement);
   const matchByRequirement = new Map(matches.map((item) => [item.requirement_id, item]));
   const solutionRisks = project.solution?.risks ?? [];
   /** 只有一份材料时不需要在每条需求上重复文件名，页码才是要找的东西 */
@@ -636,16 +633,9 @@ export function RequirementsModule({
         </section>
       </div>
 
-      {/* 这一页不再列待澄清问题：问题池只有一个家（售前建议 · 要问谁），
-          否则同一条问题会在两页各说一遍，还容易两处口径不一致 */}
-      {questions.length ? (
-        <p className="hint hint--inline">
-          还有 {questions.length} 处待澄清（其中 {judgementQuestions.length} 处会改变能力结论）
-          <button type="button" className="link-btn" onClick={openJudgement}>
-            去售前建议看「要问谁」
-          </button>
-        </p>
-      ) : null}
+      {/* 待澄清的统计与入口都不在这一页：问题池只有一个家（售前建议 ·「要问谁」），
+          那里的每条还带着「影响判断 / 影响承诺」标记，比在这里用猜出来的数字再报一次准。
+          这一页只谈结论；要去看问题就用结论条上的「去售前建议」。 */}
     </div>
   );
 }

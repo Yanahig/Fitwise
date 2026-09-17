@@ -13,3 +13,7 @@ server/data
 .tmp
 __pycache__
 *.pyc
+
+# 答辩 / 面试演示材料：PPT 本体与它的构建产物（候选稿、渲染截图、校验报告）都不进仓库
+deck/
+.deck-build/

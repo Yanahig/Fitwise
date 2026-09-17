@@ -49,10 +49,20 @@ app.add_middleware(
 
 @app.middleware("http")
 async def no_store(request, call_next):
-    """业务数据不做浏览器缓存，避免界面读到过期结论。"""
+    """缓存策略：业务数据不缓存；前端产物里 index.html 每次都回来问一句。
+
+    index.html 不带缓存指令时浏览器会按启发式规则缓存，重新构建之后打开页面还是旧的，
+    要用户手动强刷才看得到新功能（删除按钮就这么"消失"过一次）；
+    /assets/ 下的文件名带内容哈希，内容一变文件名就变，可以放心长期缓存。
+    """
     response = await call_next(request)
-    if request.url.path.startswith("/api"):
+    path = request.url.path
+    if path.startswith("/api"):
         response.headers["Cache-Control"] = "no-store"
+    elif path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif (response.headers.get("content-type") or "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 

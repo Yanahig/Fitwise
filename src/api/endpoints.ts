@@ -50,6 +50,8 @@ export const api = {
   /** 改名：AI 从材料识别出的客户/项目名，可以在这里纠正 */
   updateProject: (id: number, payload: { name?: string; owner_name?: string; summary?: string }) =>
     request<Project>(`/api/projects/${id}`, { method: 'PATCH', body: payload }),
+  /** 删项目：材料、需求、判断、建议、对话与动态一起删（不可恢复，调用前必须二次确认） */
+  deleteProject: (id: number) => request<void>(`/api/projects/${id}`, { method: 'DELETE' }),
   updateCustomer: (id: number, payload: { name?: string; industry?: string; notes?: string }) =>
     request<Customer>(`/api/customers/${id}`, { method: 'PATCH', body: payload }),
 

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -28,6 +31,7 @@ from ..serializers import (
 from ..services.activity import log_activity
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+logger = logging.getLogger(__name__)
 
 
 class ProjectRequest(BaseModel):
@@ -155,6 +159,36 @@ def update_project(
     )
     db.commit()
     return project_out(project, counts=project_counts(db, project.id))
+
+
+@router.delete("/{project_id}", status_code=204)
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """删项目：材料、需求、判断、建议、对话与动态都跟着走（外键级联），磁盘上的材料文件一起删。
+
+    删掉不可恢复，所以前端要二次确认之后才调这个接口。这里只负责删干净 ——
+    上传目录里那几份 PDF 留着的话，下次演示还会看到幽灵文件。
+    活动流不记一条"删除了项目"：那条记录本身就挂在项目上，会跟着一起没。
+    """
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    files = [
+        Path(material.storage_path)
+        for material in db.execute(select(Material).where(Material.project_id == project_id)).scalars().all()
+        if material.storage_path
+    ]
+    label = f"{project.name or '未命名项目'}（#{project_id}）"
+
+    db.delete(project)
+    db.commit()
+    for path in files:
+        path.unlink(missing_ok=True)
+    logger.info("项目删除：%s（操作人=%s）", label, user.name)
 
 
 @router.get("/{project_id}")

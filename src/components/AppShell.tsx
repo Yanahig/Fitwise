@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../state/AuthContext';
 import { api } from '../api/endpoints';
 import type { Project } from '../api/types';
@@ -14,6 +14,19 @@ function projectStatus(project: Project): string {
   if (counts.matches === 0) return '待出售前建议';
   if (counts.matches_none > 0) return `${counts.matches_none} 项暂不支持`;
   return '售前建议已出';
+}
+
+/**
+ * 界面上那行小字：这一份是从哪次构建来的（`__BUILD_ID__` 由 vite define 注入，形如
+ * `local@2026-09-17T05:58:12.345Z`）。排查"你看到的还是旧版"最省事的一条 ——
+ * 刷新之后时间戳没变，就说明拿到的是缓存或另一个部署，而不是新构建。
+ */
+function buildStamp(): string {
+  const raw = __BUILD_ID__.split('@')[1] ?? '';
+  const built = new Date(raw);
+  if (Number.isNaN(built.getTime())) return __BUILD_ID__;
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(built.getMonth() + 1)}-${pad(built.getDate())} ${pad(built.getHours())}:${pad(built.getMinutes())}`;
 }
 
 export function AppShell({
@@ -40,7 +53,7 @@ export function AppShell({
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [query, setQuery] = useState('');
 
-  useEffect(() => {
+  const loadProjects = useCallback(() => {
     api
       .projects()
       .then((items) => {
@@ -50,7 +63,18 @@ export function AppShell({
         }
       })
       .catch(() => setRecentProjects([]));
-  }, [routeProject, storedProject, path]);
+  }, [routeProject, storedProject]);
+
+  useEffect(loadProjects, [loadProjects, path]);
+
+  /**
+   * 别处改了项目集合（现在只有项目管理页的「删除」）要能让侧栏跟上。
+   * 光靠 path 变化刷新不够：删完还停在同一页，侧栏会一直挂着那条已经不存在的项目。
+   */
+  useEffect(() => {
+    window.addEventListener('fitwise:projects-changed', loadProjects);
+    return () => window.removeEventListener('fitwise:projects-changed', loadProjects);
+  }, [loadProjects]);
 
   const fallbackProject = recentProjects[0] ? String(recentProjects[0].id) : null;
   const projectId = routeProject ?? storedProject ?? fallbackProject;
@@ -144,6 +168,10 @@ export function AppShell({
               </button>
             </div>
           ) : null}
+          {/* 版本戳：刷新之后它还停在旧时间，就说明看到的是缓存 */}
+          <p className="sidebar__build" title={__BUILD_ID__}>
+            构建 {buildStamp()}
+          </p>
         </div>
       </aside>
 

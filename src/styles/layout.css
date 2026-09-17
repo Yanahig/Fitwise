@@ -312,6 +312,14 @@
   color: var(--color-tertiary-foreground);
 }
 
+/* 侧栏底部的构建时间戳：只用来回答"我看到的是哪一版"，所以压到最小 */
+.sidebar__build {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+  text-align: center;
+}
+
 /* ---------------- 主区域 ---------------- */
 
 .main {

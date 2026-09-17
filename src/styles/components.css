@@ -1678,6 +1678,19 @@
   color: var(--color-foreground);
 }
 
+/* 破坏性动作：只有"删掉就回不来"的按钮用它（项目列表的「删除」） */
+.btn--danger {
+  border-color: var(--color-border);
+  color: var(--status-none-fg);
+  background: var(--color-surface);
+}
+
+.btn--danger:hover:not(:disabled) {
+  border-color: var(--status-none-fg);
+  background: var(--status-none-bg);
+  color: var(--status-none-fg);
+}
+
 .link-btn {
   font-size: var(--text-base);
   font-weight: 600;

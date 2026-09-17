@@ -130,11 +130,26 @@ export function JudgementPage({
     );
 
   /**
-   * 结论条上的两句概括：各自指向下面那一块，点一下就跳过去 —— 它同时是这一页的目录。
-   * 「需求判断」那一句不在这里：逐条结论跟着需求卡走（需求确认页），
-   * 这一页只留"还剩什么没定"（风险 / 下一步）。
+   * 结论条上的三句概括：各自指向下面那一块 —— 它同时是这一页的目录。
+   * 「需求判断」那一句不在这里：逐条结论跟着需求卡走（能力匹配页）。
+   * 「待澄清」回答"还剩多少事"，「下一步」回答"先办哪一件、谁办、什么时候" ——
+   * 所以后者的文本要短（先取动作的第一个短句），责任人与日期跟在后面，
+   * 这样 30 个字的概括行里也放得下，点一下直接落到那一条动作上。
    */
-  const nextActionText = actions.sales[0]?.text ?? actions.customer[0]?.text ?? '还没有下一步建议，先生成一份建议';
+  const nextAction = actions.sales[0];
+  const shortActionText = (text: string) => {
+    const head = text.split(/[：:，,]/)[0].trim();
+    return head.length >= 6 ? head : text;
+  };
+  const nextStepText = nextAction
+    ? `${shortActionText(nextAction.text)}${
+        [nextAction.owner, nextAction.due?.slice(5)].filter(Boolean).length
+          ? `（${[nextAction.owner, nextAction.due?.slice(5)].filter(Boolean).join(' · ')}）`
+          : ''
+      }`
+    : actions.customer.length
+      ? `先问客户：${shortActionText(actions.customer[0].text)}`
+      : '还没有下一步建议，先生成一份建议';
   /** 待澄清统计跟着「要问谁」走：能力匹配页只在清单底下留一行入口，这里才是它的家 */
   const openQuestions = project.open_questions ?? [];
   const customerQuestionCount = openQuestions.filter((item) => (item.owner || '客户') !== '内部').length;
@@ -155,13 +170,14 @@ export function JudgementPage({
     },
     {
       label: '下一步',
-      text: nextActionText.length > 42 ? `${nextActionText.slice(0, 42)}…` : nextActionText,
-      target: 'judgement-actions',
+      text: nextStepText,
+      // 有具体动作就落到那一条上；没有动作时退回整个「要问谁」分区
+      target: nextAction ? 'next-action' : 'judgement-actions',
     },
   ];
 
-  const renderRow = (row: ActionRow) => (
-    <li key={row.text}>
+  const renderRow = (row: ActionRow, anchorId?: string) => (
+    <li key={row.text} id={anchorId}>
       <span className="action-group__tag">{row.tag}</span>
       <span className="action-group__text">
         {row.text}
@@ -315,7 +331,7 @@ export function JudgementPage({
               </span>
             </div>
             <ul className="action-group__list">
-              {actions.customer.map(renderRow)}
+              {actions.customer.map((row) => renderRow(row))}
               {actions.customer.length === 0 ? <li className="action-group__rest">暂无</li> : null}
             </ul>
           </section>
@@ -331,7 +347,7 @@ export function JudgementPage({
               </span>
             </div>
             <ul className="action-group__list">
-              {actions.internal.map(renderRow)}
+              {actions.internal.map((row) => renderRow(row))}
               {actions.internal.length === 0 ? <li className="action-group__rest">暂无</li> : null}
             </ul>
           </section>
@@ -347,7 +363,8 @@ export function JudgementPage({
               </span>
             </div>
             <ul className="action-group__list">
-              {actions.sales.map(renderRow)}
+              {/* 第一条挂个锚点：结论条上的「下一步」直接落到它身上（列表已按优先级 + 截止日期排） */}
+              {actions.sales.map((row, index) => renderRow(row, index === 0 ? 'next-action' : undefined))}
               {actions.sales.length === 0 ? <li className="action-group__rest">暂无</li> : null}
             </ul>
             {/* 没有承诺边界就不占位：能力缺口与待补依据都没有时，这一块没有可说的内容 */}

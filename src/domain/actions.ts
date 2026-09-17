@@ -32,6 +32,18 @@ export interface ActionGroups {
   confirmations: string[];
 }
 
+/** 动作排序权重：高 → 中 → 低；没写 priority 的按中处理 */
+const ACTION_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+/**
+ * 要同步销售的动作排序：先看优先级，再看截止日期（越早越前）。
+ * 「下一步」那一句取的就是排完序的第一条 —— 所以顺序必须是"最该先做的排最前"，
+ * 而不是模型写出来的先后。
+ */
+const byPriorityThenDue = (a: ActionRow, b: ActionRow): number =>
+  (ACTION_RANK[a.priority ?? ''] ?? 1) - (ACTION_RANK[b.priority ?? ''] ?? 1) ||
+  (a.due || '9999-99-99').localeCompare(b.due || '9999-99-99');
+
 export function buildActionGroups(project: Project, matches: Match[]): ActionGroups {
   const solution = project.solution;
   const seen = new Set<string>();
@@ -72,14 +84,16 @@ export function buildActionGroups(project: Project, matches: Match[]): ActionGro
     push(internal, { text: item.question, tag: actionLabel(item.question), owner: item.owner });
   }
 
-  const sales: ActionRow[] = (solution?.next_actions ?? []).map((item) => ({
-    text: item.action,
-    tag: actionLabel(item.action),
-    owner: item.owner,
-    due: item.due,
-    priority: item.priority,
-    basis: item.basis,
-  }));
+  const sales: ActionRow[] = (solution?.next_actions ?? [])
+    .map((item) => ({
+      text: item.action,
+      tag: actionLabel(item.action),
+      owner: item.owner,
+      due: item.due,
+      priority: item.priority,
+      basis: item.basis,
+    }))
+    .sort(byPriorityThenDue);
 
   return {
     customer,

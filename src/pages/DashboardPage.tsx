@@ -18,6 +18,13 @@ const INTAKE_STEPS = [
 const PENDING_CUSTOMER = '待识别客户';
 const PENDING_PROJECT = '待识别项目';
 
+/** 粘进来的文字材料按类型起名：材料清单里要能一眼看出这是邮件还是聊天记录 */
+const PASTE_KIND_LABEL: Record<'email' | 'chat' | 'other', string> = {
+  email: '邮件往来',
+  chat: '聊天记录',
+  other: '文字材料',
+};
+
 /** 三个核心功能同时也是上手路径：每一步都给出「点这里能做什么」 */
 const GUIDE_STEPS = [
   {
@@ -63,6 +70,20 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
   const [intakeRunning, setIntakeRunning] = useState(false);
   const [intakeIndex, setIntakeIndex] = useState(0);
   const [intakeBusy, setIntakeBusy] = useState(false);
+  /** 没有文件的材料（邮件、聊天记录）：粘进来，和上面选的文件一起在上传时存成一份 txt */
+  const [pasting, setPasting] = useState(false);
+  const [pasteKind, setPasteKind] = useState<'email' | 'chat' | 'other'>('email');
+  const [pasteText, setPasteText] = useState('');
+
+  const pasteFile = (() => {
+    const text = pasteText.trim();
+    if (!text) return null;
+    const stamp = new Date().toLocaleDateString('zh-CN').replace(/\//g, '-');
+    return new File([text], `${PASTE_KIND_LABEL[pasteKind]}-${stamp}.txt`, { type: 'text/plain' });
+  })();
+  /** 这一次要交给 Fitwise 的材料 = 选的文件 + 粘进来的文字 */
+  const queuedMaterials = [...intake.files, ...(pasteFile ? [pasteFile] : [])];
+  const hasMaterial = queuedMaterials.length > 0;
 
   /**
    * 拖到页面任何位置都算"选材料"：追加到表单里（同名文件不重复加），
@@ -90,8 +111,8 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
       });
       window.localStorage.setItem('fitwise.lastProject', String(project.id));
 
-      if (intake.files.length) {
-        for (const file of intake.files) {
+      if (queuedMaterials.length) {
+        for (const file of queuedMaterials) {
           await api.uploadMaterial(project.id, file);
         }
         setIntakeIndex(1);
@@ -191,7 +212,7 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
               // 名称可以留空（由材料识别），但至少要有一样：名称或材料
               disabled={
                 intakeBusy ||
-                (!intake.files.length && (!intake.customerName.trim() || !intake.projectName.trim()))
+                (!hasMaterial && (!intake.customerName.trim() || !intake.projectName.trim()))
               }
               onClick={submitIntake}
             >
@@ -226,22 +247,65 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
           <div className="list-row list-row--form">
             <span className="list-row__title">客户材料</span>
             <span className="list-row__sub">
-              {intake.files.length
-                ? `已选择 ${intake.files.length} 份：${intake.files.map((file) => file.name).join('、')}`
-                : 'PDF / Word / Excel / PPT / 图片；名称留空时至少要给一份材料，也可以把文件拖到页面任意位置'}
+              {hasMaterial
+                ? `将交给 Fitwise ${queuedMaterials.length} 份：${queuedMaterials
+                    .map((file) => file.name)
+                    .join('、')}`
+                : 'PDF / Word / Excel / PPT / 图片；邮件、聊天记录这类没有文件的，点「材料输入」粘进来。名称留空时至少要给一份材料，也可以把文件拖到页面任意位置'}
             </span>
-            <label className="btn btn--secondary btn--sm">
-              <IconFile width={13} height={13} />
-              选择文件
-              <input
-                type="file"
-                multiple
-                className="visually-hidden"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.ofd,.csv,.md"
-                onChange={(event) => setIntake({ ...intake, files: Array.from(event.target.files ?? []) })}
-              />
-            </label>
+            <span className="section-open__actions">
+              <label className="btn btn--secondary btn--sm">
+                <IconFile width={13} height={13} />
+                选择文件
+                <input
+                  type="file"
+                  multiple
+                  className="visually-hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.txt,.ofd,.csv,.md"
+                  onChange={(event) => setIntake({ ...intake, files: Array.from(event.target.files ?? []) })}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                onClick={() => setPasting((prev) => !prev)}
+              >
+                {pasting ? '取消输入' : '材料输入'}
+              </button>
+            </span>
           </div>
+
+          {/* 没有文件的材料：邮件、聊天记录、口头纪要 —— 粘正文进来，点「开始分析」时和文件一起存成材料 */}
+          {pasting ? (
+            <section className="paste-panel">
+              <label className="field">
+                <span className="field__label">这是一份什么材料</span>
+                <select
+                  className="textarea"
+                  value={pasteKind}
+                  onChange={(event) => setPasteKind(event.target.value as 'email' | 'chat' | 'other')}
+                >
+                  <option value="email">邮件往来</option>
+                  <option value="chat">聊天记录</option>
+                  <option value="other">其他文字材料</option>
+                </select>
+              </label>
+              <label className="field">
+                <span className="field__label">正文</span>
+                <textarea
+                  className="textarea"
+                  rows={5}
+                  placeholder="把邮件正文或聊天记录粘在这里，例如「收件人：… 主题：工期调整 正文：经研究，一期上线时间调整为 3 个月」"
+                  value={pasteText}
+                  onChange={(event) => setPasteText(event.target.value)}
+                />
+              </label>
+              <p className="hint hint--inline">
+                点「开始分析」时，这段文字会和上面选的文件一起存成材料，走的是同一条解析与整理链路。
+                {pasteFile ? ` 当前会存成「${pasteFile.name}」。` : ''}
+              </p>
+            </section>
+          ) : null}
 
           {intakeRunning ? (
             <div className="list-row list-row--form">
